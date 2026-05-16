@@ -7,16 +7,18 @@ export class ProviderError extends Error {
     message: string,
     public readonly source: "marudor" | "db-rest",
     public readonly kind: "timeout" | "http" | "parse" | "not_found",
-    public readonly cause?: unknown,
+    cause?: unknown,
   ) {
-    super(message);
+    super(message, { cause });
     this.name = "ProviderError";
   }
 }
 
 export class AllProvidersFailedError extends Error {
   constructor(public readonly errors: ProviderError[]) {
-    super(`All providers failed: ${errors.map((e) => e.message).join("; ")}`);
+    super(`All providers failed: ${errors.map((e) => e.message).join("; ")}`, {
+      cause: errors[0],
+    });
     this.name = "AllProvidersFailedError";
   }
 }

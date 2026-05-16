@@ -36,6 +36,7 @@ export interface OutgoingConnection {
   destination: string;
   scheduledDeparture: string; // ISO 8601
   predictedDeparture: string; // ISO 8601
+  /** Delay of this connection's *departure* from the transfer station, in minutes. */
   delayMinutes: number;
   /** Marudor flag — true when DB has committed to holding this connection. */
   willBeHeld?: boolean;
@@ -52,7 +53,7 @@ export interface Stopover {
   departureDelayMinutes?: number;
   platformScheduled?: string;
   platformActual?: string;
-  cancelled?: boolean;
+  cancelled: boolean;
   /** Trains departing from this station that connect from the current one. */
   outgoingConnections: OutgoingConnection[];
   /** Free-text messages attached to this stop. */
