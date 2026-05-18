@@ -1,0 +1,288 @@
+{
+  "stops": [
+    {
+      "stopPlace": {
+        "evaNumber": "8098160",
+        "name": "Berlin Hbf",
+        "ril100": "BL"
+      },
+      "departure": {
+        "scheduledTime": "2026-05-18T07:27:00.000Z",
+        "time": "2026-05-18T07:27:33.000Z",
+        "cancelled": null,
+        "additional": null,
+        "delay": 0,
+        "scheduledPlatform": "4",
+        "platform": "4",
+        "isRealTime": true,
+        "noPassengerChange": null,
+        "codeShares": null,
+        "transport": {
+          "administration": {
+            "administrationID": "80",
+            "operatorCode": "---",
+            "operatorName": "DB"
+          },
+          "category": "ICE",
+          "categoryInternal": "ICE",
+          "direction": {
+            "stopPlaces": [
+              {
+                "evaNumber": "8000261",
+                "ifopt": "",
+                "name": "München Hbf"
+              }
+            ]
+          },
+          "journeyDescription": "ICE 597",
+          "journeyNumber": 597,
+          "label": "",
+          "operationalJourneyNumber": "",
+          "type": "HIGH_SPEED_TRAIN"
+        },
+        "id": "8098160_D_1"
+      },
+      "codeShares": null
+    },
+    {
+      "stopPlace": {
+        "evaNumber": "8011113",
+        "name": "Berlin Südkreuz",
+        "ril100": "BPAF"
+      },
+      "arrival": {
+        "scheduledTime": "2026-05-18T07:33:00.000Z",
+        "time": "2026-05-18T07:31:14.000Z",
+        "cancelled": null,
+        "additional": null,
+        "delay": -2,
+        "scheduledPlatform": "5",
+        "platform": "5",
+        "isRealTime": true,
+        "noPassengerChange": true,
+        "codeShares": null,
+        "id": "8011113_A_1"
+      },
+      "departure": {
+        "scheduledTime": "2026-05-18T07:35:00.000Z",
+        "time": "2026-05-18T07:35:32.000Z",
+        "cancelled": null,
+        "additional": null,
+        "delay": 0,
+        "scheduledPlatform": "5",
+        "platform": "5",
+        "isRealTime": true,
+        "noPassengerChange": null,
+        "codeShares": null,
+        "id": "8011113_D_1"
+      },
+      "codeShares": null
+    },
+    {
+      "stopPlace": {
+        "evaNumber": "8010222",
+        "name": "Lutherstadt Wittenberg Hbf",
+        "ril100": "LW"
+      },
+      "arrival": {
+        "scheduledTime": "2026-05-18T08:09:00.000Z",
+        "time": "2026-05-18T08:09:02.000Z",
+        "cancelled": null,
+        "additional": null,
+        "delay": 0,
+        "scheduledPlatform": "2",
+        "platform": "2",
+        "isRealTime": true,
+        "noPassengerChange": null,
+        "codeShares": null,
+        "id": "8010222_A_1"
+      },
+      "departure": {
+        "scheduledTime": "2026-05-18T08:11:00.000Z",
+        "time": "2026-05-18T08:12:11.000Z",
+        "cancelled": null,
+        "additional": null,
+        "delay": 1,
+        "scheduledPlatform": "2",
+        "platform": "2",
+        "isRealTime": true,
+        "noPassengerChange": null,
+        "codeShares": null,
+        "id": "8010222_D_1"
+      },
+      "codeShares": null
+    },
+    {
+      "stopPlace": {
+        "evaNumber": "8010205",
+        "name": "Leipzig Hbf",
+        "ril100": "LL"
+      },
+      "arrival": {
+        "scheduledTime": "2026-05-18T08:42:00.000Z",
+        "time": "2026-05-18T08:45:05.000Z",
+        "cancelled": null,
+        "additional": null,
+        "delay": 3,
+        "scheduledPlatform": "13",
+        "platform": "13",
+        "isRealTime": true,
+        "noPassengerChange": null,
+        "codeShares": null,
+        "id": "8010205_A_1"
+      },
+      "departure": {
+        "scheduledTime": "2026-05-18T08:49:00.000Z",
+        "time": "2026-05-18T08:50:45.000Z",
+        "cancelled": null,
+        "additional": null,
+        "delay": 1,
+        "scheduledPlatform": "13",
+        "platform": "13",
+        "isRealTime": true,
+        "noPassengerChange": null,
+        "codeShares": null,
+        "id": "8010205_D_1"
+      },
+      "codeShares": null
+    },
+    {
+      "stopPlace": {
+        "evaNumber": "8010101",
+        "name": "Erfurt Hbf",
+        "ril100": "UE  P"
+      },
+      "arrival": {
+        "scheduledTime": "2026-05-18T09:28:00.000Z",
+        "time": "2026-05-18T09:29:12.000Z",
+        "cancelled": null,
+        "additional": null,
+        "delay": 1,
+        "scheduledPlatform": "2",
+        "platform": "2",
+        "isRealTime": true,
+        "noPassengerChange": null,
+        "codeShares": null,
+        "id": "8010101_A_1"
+      },
+      "departure": {
+        "scheduledTime": "2026-05-18T09:30:00.000Z",
+        "time": "2026-05-18T09:32:28.000Z",
+        "cancelled": null,
+        "additional": null,
+        "delay": 2,
+        "scheduledPlatform": "2",
+        "platform": "2",
+        "isRealTime": true,
+        "noPassengerChange": null,
+        "codeShares": null,
+        "id": "8010101_D_1"
+      },
+      "codeShares": null
+    }
+  ],
+  "segmentStart": {
+    "evaNumber": "8098160",
+    "name": "Berlin Hbf",
+    "ril100": "BL"
+  },
+  "segmentDestination": {
+    "evaNumber": "8000261",
+    "name": "München Hbf",
+    "ril100": "MH"
+  },
+  "journeyId": "20260518-589dd5e9-6c97-3e24-9eb8-9d9f8871de73",
+  "arrival": {
+    "scheduledTime": "2026-05-18T15:16:00.000Z",
+    "time": "2026-05-18T15:37:26.000Z",
+    "cancelled": null,
+    "additional": null,
+    "delay": 21,
+    "scheduledPlatform": "14",
+    "platform": "14",
+    "isRealTime": true,
+    "noPassengerChange": null,
+    "codeShares": null,
+    "transport": {
+      "administration": {
+        "administrationID": "80",
+        "operatorCode": "---",
+        "operatorName": "DB"
+      },
+      "category": "ICE",
+      "categoryInternal": "ICE",
+      "direction": {
+        "stopPlaces": [
+          {
+            "evaNumber": "8000261",
+            "ifopt": "",
+            "name": "München Hbf"
+          }
+        ]
+      },
+      "journeyDescription": "ICE 597",
+      "journeyNumber": 597,
+      "label": "",
+      "operationalJourneyNumber": "",
+      "type": "HIGH_SPEED_TRAIN"
+    },
+    "id": "8000261_A_1"
+  },
+  "departure": {
+    "scheduledTime": "2026-05-18T07:27:00.000Z",
+    "time": "2026-05-18T07:27:33.000Z",
+    "cancelled": null,
+    "additional": null,
+    "delay": 0,
+    "scheduledPlatform": "4",
+    "platform": "4",
+    "isRealTime": true,
+    "noPassengerChange": null,
+    "codeShares": null,
+    "transport": {
+      "administration": {
+        "administrationID": "80",
+        "operatorCode": "---",
+        "operatorName": "DB"
+      },
+      "category": "ICE",
+      "categoryInternal": "ICE",
+      "direction": {
+        "stopPlaces": [
+          {
+            "evaNumber": "8000261",
+            "ifopt": "",
+            "name": "München Hbf"
+          }
+        ]
+      },
+      "journeyDescription": "ICE 597",
+      "journeyNumber": 597,
+      "label": "",
+      "operationalJourneyNumber": "",
+      "type": "HIGH_SPEED_TRAIN"
+    },
+    "id": "8098160_D_1"
+  },
+  "finalDestination": "München Hbf",
+  "train": {
+    "category": "ICE",
+    "journeyNumber": 597,
+    "admin": "80",
+    "line": null,
+    "customLine": "11",
+    "transportType": "HIGH_SPEED_TRAIN",
+    "operator": "DB Fernverkehr AG",
+    "name": "ICE 597"
+  },
+  "type": "JNY",
+  "cancelled": null,
+  "continuationFor": null,
+  "continuationBy": null,
+  "lastKnownPosition": {
+    "latitude": 48.1401983333,
+    "longitude": 11.5557533333,
+    "time": "2026-05-18T15:41:29.000Z"
+  },
+  "currentStop": null
+}

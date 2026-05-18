@@ -1,0 +1,324 @@
+{
+  "departures": [
+    {
+      "o": "NXRE",
+      "initialDeparture": "2026-05-18T15:35:00.000Z",
+      "arrival": {
+        "scheduledTime": "2026-05-18T18:18:00.000+02:00",
+        "time": "2026-05-18T19:17:00.000+02:00",
+        "wingIds": null,
+        "platform": "4 A-C",
+        "scheduledPlatform": "4 A-C",
+        "hidden": false,
+        "transition": null,
+        "cancelled": false,
+        "delay": 59
+      },
+      "departure": {
+        "scheduledTime": "2026-05-18T18:21:00.000+02:00",
+        "time": "2026-05-18T19:19:00.000+02:00",
+        "wingIds": null,
+        "platform": "4 A-C",
+        "scheduledPlatform": "4 A-C",
+        "hidden": false,
+        "transition": null,
+        "cancelled": false,
+        "delay": 58
+      },
+      "productClass": null,
+      "currentStopPlace": {
+        "name": "Köln Hbf",
+        "evaNumber": "8000207"
+      },
+      "scheduledDestination": "Köln Messe/Deutz",
+      "id": "7382006731006813311",
+      "rawId": "7382006731006813311-2605181735-6",
+      "mediumId": "7382006731006813311-2605181735",
+      "substitute": null,
+      "train": {
+        "name": "NX RE7",
+        "journeyNumber": 17428,
+        "line": "RE7",
+        "customLine": null,
+        "category": "NX",
+        "admin": "NXRE"
+      },
+      "additional": null,
+      "messages": {
+        "delay": [
+          {
+            "superseded": null,
+            "text": "Verspätung eines vorausfahrenden Zuges",
+            "timestamp": "2026-05-18T16:59:54.984+02:00",
+            "priority": null,
+            "value": 43
+          }
+        ],
+        "qos": [
+          {
+            "superseded": null,
+            "text": "Mehrere Wagen fehlen",
+            "timestamp": "2026-05-18T03:51:51.593+02:00",
+            "priority": null,
+            "value": 82
+          },
+          {
+            "superseded": null,
+            "text": "Keine Qualitätsmängel",
+            "timestamp": "2026-05-18T03:49:49.520+02:00",
+            "priority": null,
+            "value": 88
+          }
+        ],
+        "him": []
+      },
+      "ref": null,
+      "cancelled": false,
+      "route": [
+        {
+          "name": "Krefeld Hbf"
+        },
+        {
+          "name": "Krefeld-Oppum"
+        },
+        {
+          "name": "Meerbusch-Osterath"
+        },
+        {
+          "name": "Neuss Hbf"
+        },
+        {
+          "name": "Dormagen"
+        },
+        {
+          "name": "Köln Hbf",
+          "cancelled": false,
+          "additional": null
+        },
+        {
+          "name": "Köln Messe/Deutz"
+        }
+      ],
+      "destination": "Köln Messe/Deutz",
+      "platform": "4 A-C",
+      "scheduledPlatform": "4 A-C",
+      "initialStopPlace": "8000211"
+    },
+    {
+      "o": "NXRB",
+      "initialDeparture": "2026-05-18T15:43:00.000Z",
+      "arrival": {
+        "scheduledTime": "2026-05-18T16:22:00.000Z",
+        "time": "2026-05-18T18:42:00.000+02:00",
+        "wingIds": null,
+        "platform": "1 A-C",
+        "scheduledPlatform": "1 A-C",
+        "hidden": false,
+        "transition": null,
+        "cancelled": false,
+        "delay": 20
+      },
+      "departure": {
+        "scheduledTime": "2026-05-18T16:25:00.000Z",
+        "time": "2026-05-18T18:44:00.000+02:00",
+        "wingIds": null,
+        "platform": "1 A-C",
+        "scheduledPlatform": "1 A-C",
+        "hidden": false,
+        "transition": null,
+        "cancelled": false,
+        "delay": 19
+      },
+      "productClass": null,
+      "currentStopPlace": {
+        "name": "Köln Hbf",
+        "evaNumber": "8000207"
+      },
+      "scheduledDestination": "Köln Messe/Deutz",
+      "id": "2922924207880664893",
+      "rawId": "2922924207880664893-2605181743-11",
+      "mediumId": "2922924207880664893-2605181743",
+      "substitute": null,
+      "train": {
+        "name": "NX RB48",
+        "journeyNumber": 17358,
+        "line": "RB48",
+        "customLine": null,
+        "category": "NX",
+        "admin": "NXRB"
+      },
+      "additional": null,
+      "messages": {
+        "delay": [
+          {
+            "superseded": null,
+            "text": "verspätete Bereitstellung des Zuges",
+            "timestamp": "2026-05-18T18:04:50.432+02:00",
+            "priority": null,
+            "value": 47
+          },
+          {
+            "superseded": null,
+            "text": "Vorfahrt eines anderen Zuges",
+            "timestamp": "2026-05-18T17:32:01.007+02:00",
+            "priority": null,
+            "value": 45
+          }
+        ],
+        "qos": [],
+        "him": []
+      },
+      "ref": null,
+      "cancelled": false,
+      "route": [
+        {
+          "name": "Bonn-Mehlem"
+        },
+        {
+          "name": "Bonn-Bad Godesberg"
+        },
+        {
+          "name": "Bonn UN Campus"
+        },
+        {
+          "name": "Bonn Hbf"
+        },
+        {
+          "name": "Roisdorf"
+        },
+        {
+          "name": "Sechtem"
+        },
+        {
+          "name": "Brühl"
+        },
+        {
+          "name": "Hürth-Kalscheuren"
+        },
+        {
+          "name": "Köln Süd"
+        },
+        {
+          "name": "Köln West"
+        },
+        {
+          "name": "Köln Hbf",
+          "cancelled": false,
+          "additional": null
+        },
+        {
+          "name": "Köln Messe/Deutz"
+        }
+      ],
+      "destination": "Köln Messe/Deutz",
+      "platform": "1 A-C",
+      "scheduledPlatform": "1 A-C",
+      "initialStopPlace": "8001085"
+    },
+    {
+      "o": "8003G1",
+      "initialDeparture": "2026-05-18T16:23:00.000Z",
+      "arrival": {
+        "scheduledTime": "2026-05-18T16:26:00.000Z",
+        "time": "2026-05-18T18:37:00.000+02:00",
+        "wingIds": null,
+        "platform": "6 D-G",
+        "scheduledPlatform": "7",
+        "hidden": false,
+        "transition": null,
+        "cancelled": false,
+        "delay": 11
+      },
+      "departure": {
+        "scheduledTime": "2026-05-18T16:29:00.000Z",
+        "time": "2026-05-18T18:40:00.000+02:00",
+        "wingIds": null,
+        "platform": "6 D-G",
+        "scheduledPlatform": "7",
+        "hidden": false,
+        "transition": null,
+        "cancelled": false,
+        "delay": 11
+      },
+      "productClass": "N",
+      "currentStopPlace": {
+        "name": "Köln Hbf",
+        "evaNumber": "8000207"
+      },
+      "scheduledDestination": "Bedburg (Erft)",
+      "id": "6533687613722221275",
+      "rawId": "-6533687613722221275-2605181823-2",
+      "mediumId": "6533687613722221275-2605181823",
+      "substitute": null,
+      "train": {
+        "name": "RB38",
+        "journeyNumber": 10278,
+        "line": "RB38",
+        "customLine": null,
+        "category": "RB",
+        "admin": "8003G1"
+      },
+      "additional": null,
+      "messages": {
+        "delay": [
+          {
+            "superseded": null,
+            "text": "Verspätung eines vorausfahrenden Zuges",
+            "timestamp": "2026-05-18T18:31:21.531+02:00",
+            "priority": null,
+            "value": 43
+          }
+        ],
+        "qos": [],
+        "him": []
+      },
+      "ref": null,
+      "cancelled": false,
+      "route": [
+        {
+          "name": "Köln Messe/Deutz"
+        },
+        {
+          "name": "Köln Hbf",
+          "cancelled": false,
+          "additional": null
+        },
+        {
+          "name": "Köln-Ehrenfeld",
+          "showVia": true
+        },
+        {
+          "name": "Horrem",
+          "showVia": true
+        },
+        {
+          "name": "Quadrath-Ichendorf",
+          "showVia": true
+        },
+        {
+          "name": "Bergheim (Erft)"
+        },
+        {
+          "name": "Zieverich"
+        },
+        {
+          "name": "Paffendorf"
+        },
+        {
+          "name": "Glesch"
+        },
+        {
+          "name": "Bedburg (Erft)"
+        }
+      ],
+      "destination": "Bedburg (Erft)",
+      "platform": "6 D-G",
+      "scheduledPlatform": "7",
+      "initialStopPlace": "8003368"
+    }
+  ],
+  "lookbehind": [],
+  "wings": {},
+  "stopPlaces": {},
+  "strike": 0
+}
