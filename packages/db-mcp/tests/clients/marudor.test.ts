@@ -16,7 +16,13 @@ function makeRpcResponse(data: unknown): string {
 describe("MarudorClient.searchStations", () => {
   it("happy path: returns stations from fixture data", async () => {
     mswServer.use(
-      http.get(`${BASE_URL}/rpc/stopPlace.byTerm`, () => {
+      http.get(`${BASE_URL}/rpc/stopPlace.byTerm`, ({ request }) => {
+        // Verify the encoding pipeline: ?input=<URL-encoded JSON string of devalue output>
+        const rawInput = new URL(request.url).searchParams.get("input");
+        expect(rawInput).not.toBeNull();
+        const innerJsonString = JSON.parse(rawInput!);
+        const decoded = devalue.parse(innerJsonString);
+        expect(decoded).toEqual({ searchTerm: "Köln Hbf" });
         return new HttpResponse(makeRpcResponse(fixture), {
           status: 200,
           headers: { "Content-Type": "application/json" },

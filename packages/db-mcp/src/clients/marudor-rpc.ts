@@ -57,7 +57,6 @@ export class MarudorRpc {
         },
       });
     } catch (err: unknown) {
-      clearTimeout(timer);
       if (
         err instanceof Error &&
         (err.name === "AbortError" || err.message.includes("aborted"))
