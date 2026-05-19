@@ -1,0 +1,161 @@
+{
+  "arrivalCanceled": false,
+  "arrivalID": "8010101_A_1",
+  "arrivalPlatform": "2",
+  "arrivalPlatformSchedule": "2",
+  "arrivalTime": "2026-05-18T09:29:12+00:00",
+  "arrivalTimeSchedule": "2026-05-18T09:28:00+00:00",
+  "arrivalTimeType": "REAL",
+  "connections": [
+    {
+      "additional": false,
+      "canceled": false,
+      "connectionSource": "CALCULATED_SCHEDULE",
+      "connectionStatusByPersona": [
+        {
+          "distance": null,
+          "duration": "PT5M",
+          "persona": "HANDICAPPED",
+          "status": "CRITICAL"
+        },
+        {
+          "distance": null,
+          "duration": "PT5M",
+          "persona": "FREQUENT_TRAVELLER",
+          "status": "POSSIBLE"
+        },
+        {
+          "distance": null,
+          "duration": "PT5M",
+          "persona": "OCCASIONAL_TRAVELLER",
+          "status": "POSSIBLE"
+        }
+      ],
+      "connectionStatusByPersonaScheduled": [
+        {
+          "distance": null,
+          "duration": "PT5M",
+          "persona": "HANDICAPPED",
+          "status": "POSSIBLE"
+        },
+        {
+          "distance": null,
+          "duration": "PT5M",
+          "persona": "FREQUENT_TRAVELLER",
+          "status": "POSSIBLE"
+        },
+        {
+          "distance": null,
+          "duration": "PT5M",
+          "persona": "OCCASIONAL_TRAVELLER",
+          "status": "POSSIBLE"
+        }
+      ],
+      "departureID": "645826_D_1",
+      "dispositionStatus": null,
+      "disruptions": [],
+      "futureDisruptions": false,
+      "journeyID": "20260518-04a163b2-8d91-3f5e-bf72-1234abcd5678",
+      "journeyType": "REGULAR",
+      "messages": [],
+      "platform": "3",
+      "platformHint": null,
+      "platformSchedule": "3",
+      "station": {
+        "evaNumber": "8010101",
+        "ifopt": "de:16051:1000",
+        "name": "Erfurt Hbf",
+        "ril100": "UE  P"
+      },
+      "time": "2026-05-18T09:35:00+00:00",
+      "timeSchedule": "2026-05-18T09:34:00+00:00",
+      "timeType": "REAL",
+      "transport": {
+        "category": "ICE",
+        "destination": {
+          "evaNumber": "8000261",
+          "name": "München Hbf"
+        },
+        "line": null,
+        "journeyNumber": 1587,
+        "type": "HIGH_SPEED_TRAIN"
+      }
+    },
+    {
+      "additional": false,
+      "canceled": false,
+      "connectionSource": "CALCULATED_SCHEDULE",
+      "connectionStatusByPersona": [
+        {
+          "distance": null,
+          "duration": "PT3M",
+          "persona": "HANDICAPPED",
+          "status": "IMPOSSIBLE"
+        },
+        {
+          "distance": null,
+          "duration": "PT3M",
+          "persona": "FREQUENT_TRAVELLER",
+          "status": "IMPOSSIBLE"
+        },
+        {
+          "distance": null,
+          "duration": "PT3M",
+          "persona": "OCCASIONAL_TRAVELLER",
+          "status": "IMPOSSIBLE"
+        }
+      ],
+      "connectionStatusByPersonaScheduled": [
+        {
+          "distance": null,
+          "duration": "PT3M",
+          "persona": "HANDICAPPED",
+          "status": "POSSIBLE"
+        },
+        {
+          "distance": null,
+          "duration": "PT3M",
+          "persona": "FREQUENT_TRAVELLER",
+          "status": "POSSIBLE"
+        },
+        {
+          "distance": null,
+          "duration": "PT3M",
+          "persona": "OCCASIONAL_TRAVELLER",
+          "status": "POSSIBLE"
+        }
+      ],
+      "departureID": "645827_D_1",
+      "dispositionStatus": null,
+      "disruptions": [],
+      "futureDisruptions": false,
+      "journeyID": "20260518-bb2211cc-dead-beef-cafe-000000000001",
+      "journeyType": "REGULAR",
+      "messages": [],
+      "platform": "",
+      "platformHint": "DIFFERING_PLATFORM",
+      "platformSchedule": "",
+      "station": {
+        "evaNumber": "645826",
+        "ifopt": "de:16051:151196",
+        "name": "Hauptbahnhof, Erfurt",
+        "ril100": null
+      },
+      "time": "2026-05-18T09:31:00+00:00",
+      "timeSchedule": "2026-05-18T09:31:00+00:00",
+      "timeType": "PREVIEW",
+      "transport": {
+        "category": "STR",
+        "destination": {
+          "evaNumber": "645999",
+          "name": "Rieth, Erfurt"
+        },
+        "line": "STR 6",
+        "journeyNumber": 1762,
+        "type": "TRAM"
+      }
+    }
+  ],
+  "disruptions": [],
+  "journeyID": "20260518-589dd5e9-6c97-3e24-9eb8-9d9f8871de73"
+}

@@ -1,0 +1,24 @@
+[
+  {
+    "journeyId": "20260518-589dd5e9-6c97-3e24-9eb8-9d9f8871de73",
+    "train": {
+      "line": null,
+      "category": "ICE",
+      "journeyNumber": 597,
+      "transportType": "HIGH_SPEED_TRAIN"
+    },
+    "stops": [],
+    "firstStop": {
+      "stopPlace": {
+        "evaNumber": "8098160",
+        "name": "Berlin Hbf"
+      }
+    },
+    "lastStop": {
+      "stopPlace": {
+        "evaNumber": "8000261",
+        "name": "München Hbf"
+      }
+    }
+  }
+]
