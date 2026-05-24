@@ -366,13 +366,22 @@ export class MarudorClient {
    * Procedure: journey.detailsByJourneyId
    */
   async getJourneyDetails(journeyId: string): Promise<TrainStatus> {
+    const raw = await this._fetchDetailsRaw(journeyId);
+    return this._mapDetailsToTrainStatus(raw, journeyId);
+  }
+
+  private async _fetchDetailsRaw(journeyId: string): Promise<RawJourneyDetails> {
     const raw = await this.rpc.query<unknown>(
       "journey.detailsByJourneyId",
       journeyId,
     );
+    return raw as RawJourneyDetails;
+  }
 
-    const details = raw as RawJourneyDetails;
-
+  private _mapDetailsToTrainStatus(
+    details: RawJourneyDetails,
+    fallbackJourneyId: string,
+  ): TrainStatus {
     const trainName =
       toStr(details.train?.name) ??
       (() => {
@@ -402,7 +411,7 @@ export class MarudorClient {
     }
 
     const identifier: TrainIdentifier = {
-      journeyId: toStr(details.journeyId) ?? journeyId,
+      journeyId: toStr(details.journeyId) ?? fallbackJourneyId,
       name: trainName,
       origin,
       destination,
@@ -458,18 +467,10 @@ export class MarudorClient {
     const candidates = await this.findJourney(trainName, date);
     const { journeyId } = candidates[0];
 
-    // Step 2: fetch full timeline
-    const status = await this.getJourneyDetails(journeyId);
-
-    // Step 3: in parallel, fetch connections for each stop that has an arrivalId
-    // We need the raw arrival IDs from the details response — re-fetch them from
-    // the stopovers we built. But we need the raw arrival.id values, which are
-    // in the stopovers' stop events. Re-derive from the raw response is cleaner;
-    // however we already mapped them away. Instead, we re-query the raw details.
-    const rawDetails = await this.rpc.query<RawJourneyDetails>(
-      "journey.detailsByJourneyId",
-      journeyId,
-    );
+    // Step 2: fetch full timeline ONCE and reuse the raw response for both
+    // the TrainStatus mapping and the per-stop arrival ID extraction below.
+    const rawDetails = await this._fetchDetailsRaw(journeyId);
+    const status = this._mapDetailsToTrainStatus(rawDetails, journeyId);
 
     const rawStops: RawStop[] = rawDetails.stops ?? [];
 
