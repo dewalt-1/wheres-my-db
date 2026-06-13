@@ -8,6 +8,8 @@ import stationSearchFixture from "../fixtures/station-search.json" assert { type
 import journeyFindFixture from "../fixtures/journey-find.json" assert { type: "json" };
 import trainDetailsFixture from "../fixtures/train-details.json" assert { type: "json" };
 import connectionsFixture from "../fixtures/connections.json" assert { type: "json" };
+import bahnRoutingFixture from "../fixtures/bahn-routing.json" assert { type: "json" };
+import disruptionsFixture from "../fixtures/disruptions.json" assert { type: "json" };
 
 const BASE_URL = "https://bahn.expert";
 
@@ -377,5 +379,129 @@ describe("MarudorClient.getTrainStatus", () => {
     // Other stops with arrivalIds still have connections
     const suedkreuz = status.stopovers.find((s) => s.evaNumber === "8011113");
     expect(suedkreuz!.outgoingConnections.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// searchJourneys
+// ---------------------------------------------------------------------------
+
+describe("MarudorClient.searchJourneys", () => {
+  it("happy path: returns JourneyOption[] with legs mapped from bahn.routing fixture", async () => {
+    mswServer.use(
+      http.get(`${BASE_URL}/rpc/bahn.routing`, ({ request }) => {
+        const rawInput = new URL(request.url).searchParams.get("input");
+        expect(rawInput).not.toBeNull();
+        const innerJsonString = JSON.parse(rawInput!);
+        const decoded = devalue.parse(innerJsonString) as {
+          start: { type: string; evaNumber: string };
+          destination: { type: string; evaNumber: string };
+          searchForDeparture: boolean;
+          time: Date;
+          klasse: string;
+        };
+        expect(decoded.start.evaNumber).toBe("8098160");
+        expect(decoded.destination.evaNumber).toBe("8000261");
+        expect(decoded.searchForDeparture).toBe(true);
+        expect(decoded.klasse).toBe("KLASSE_2");
+        expect(decoded.time).toBeInstanceOf(Date);
+        return new HttpResponse(makeRpcResponse(bahnRoutingFixture), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    const client = new MarudorClient({ baseUrl: BASE_URL });
+    const options = await client.searchJourneys("8098160", "8000261");
+
+    expect(options.length).toBeGreaterThan(0);
+
+    // First option has at least one leg
+    const option = options[0];
+    expect(option.legs.length).toBeGreaterThan(0);
+
+    // First leg has required fields
+    const leg = option.legs[0];
+    expect(leg.trainName).toBe("ICE 597");
+    expect(leg.from.evaNumber).toBe("8098160");
+    expect(leg.from.name).toBe("Berlin Hbf");
+    expect(leg.to.evaNumber).toBe("8011113");
+    expect(leg.to.name).toBe("Berlin Südkreuz");
+    expect(leg.scheduledDeparture).toBe("2026-05-18T07:27:00.000Z");
+    expect(leg.predictedDeparture).toBe("2026-05-18T07:27:33.000Z");
+    expect(leg.scheduledArrival).toBe("2026-05-18T07:33:00.000Z");
+    expect(leg.predictedArrival).toBe("2026-05-18T07:31:14.000Z");
+    expect(leg.departureDelayMinutes).toBe(0);
+    expect(leg.arrivalDelayMinutes).toBe(-2);
+
+    // riskyTransfers starts empty (Task 16 fills it in)
+    expect(option.riskyTransfers).toEqual([]);
+  });
+
+  it("upstream 500: bubbles ProviderError with kind=http", async () => {
+    mswServer.use(
+      http.get(`${BASE_URL}/rpc/bahn.routing`, () => {
+        return new HttpResponse("Internal Server Error", { status: 500 });
+      }),
+    );
+
+    const client = new MarudorClient({ baseUrl: BASE_URL });
+    await expect(
+      client.searchJourneys("8098160", "8000261"),
+    ).rejects.toSatisfy(
+      (err: unknown) =>
+        err instanceof ProviderError &&
+        err.kind === "http" &&
+        err.source === "marudor",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getDisruptions
+// ---------------------------------------------------------------------------
+
+describe("MarudorClient.getDisruptions", () => {
+  it("happy path: returns Disruption[] with HIM messages, deduped by id", async () => {
+    mswServer.use(
+      http.get(`${BASE_URL}/rpc/iris.departures`, ({ request }) => {
+        const rawInput = new URL(request.url).searchParams.get("input");
+        expect(rawInput).not.toBeNull();
+        const innerJsonString = JSON.parse(rawInput!);
+        const decoded = devalue.parse(innerJsonString) as {
+          evaNumber: string;
+        };
+        expect(decoded.evaNumber).toBe("8000207");
+        return new HttpResponse(makeRpcResponse(disruptionsFixture), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    const client = new MarudorClient({ baseUrl: BASE_URL });
+    const disruptions = await client.getDisruptions({ evaNumber: "8000207" });
+
+    // Two departures both have HIM-001 → should be deduped to one Disruption
+    expect(disruptions.length).toBe(1);
+
+    const disruption = disruptions[0];
+    expect(disruption.id).toBe("HIM-001");
+    expect(disruption.headline).toBe("Stellwerksstörung");
+    expect(disruption.description).toBe(
+      "Beeinträchtigung durch Stellwerksstörung",
+    );
+    expect(disruption.severity).toBe("high"); // "Stellwerk" → "high"
+    expect(disruption.affectedSegments).toEqual([]);
+    expect(disruption.startTime).toBe("2026-05-18T16:00:00.000+02:00");
+  });
+
+  it("without evaNumber: returns [] without invoking any rpc call", async () => {
+    // No MSW handler registered — if a call happens, it will fail
+    const client = new MarudorClient({ baseUrl: BASE_URL });
+    const disruptions = await client.getDisruptions({});
+
+    expect(disruptions).toEqual([]);
   });
 });

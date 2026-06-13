@@ -2,6 +2,9 @@
 // Each method maps a tRPC procedure response to a domain type.
 
 import type {
+  Disruption,
+  JourneyLeg,
+  JourneyOption,
   OutgoingConnection,
   Station,
   Stopover,
@@ -112,6 +115,54 @@ interface RawConnectionsResponse {
   arrivalID?: unknown;
   arrivalTime?: unknown;
   arrivalCanceled?: unknown;
+}
+
+// ---------------------------------------------------------------------------
+// Raw shapes from bahn.routing
+// ---------------------------------------------------------------------------
+
+interface RawJourneySearchLeg {
+  trainName?: unknown;
+  from?: { evaNumber?: unknown; name?: unknown };
+  to?: { evaNumber?: unknown; name?: unknown };
+  scheduledDeparture?: unknown;
+  predictedDeparture?: unknown;
+  scheduledArrival?: unknown;
+  predictedArrival?: unknown;
+  departureDelayMinutes?: unknown;
+  arrivalDelayMinutes?: unknown;
+}
+
+interface RawJourneySearchOption {
+  legs?: RawJourneySearchLeg[];
+}
+
+interface RawJourneySearchResponse {
+  routes?: RawJourneySearchOption[];
+}
+
+// ---------------------------------------------------------------------------
+// Raw shapes from iris.departures (for HIM messages)
+// ---------------------------------------------------------------------------
+
+interface RawHimMessage {
+  id?: unknown;
+  headline?: unknown;
+  text?: unknown;
+  timestamp?: unknown;
+}
+
+interface RawDepartureMessages {
+  him?: RawHimMessage[];
+}
+
+interface RawDeparture {
+  currentStopPlace?: { evaNumber?: unknown };
+  messages?: RawDepartureMessages;
+}
+
+interface RawDisruptionsResponse {
+  departures?: RawDeparture[];
 }
 
 // ---------------------------------------------------------------------------
@@ -233,6 +284,67 @@ function mapConnection(raw: RawConnection): OutgoingConnection {
     delayMinutes,
     ...(willBeHeld !== undefined ? { willBeHeld } : {}),
   };
+}
+
+function mapJourneyLeg(raw: RawJourneySearchLeg): JourneyLeg | null {
+  const trainName = toStr(raw.trainName);
+  const fromEva = toStr(raw.from?.evaNumber);
+  const fromName = toStr(raw.from?.name);
+  const toEva = toStr(raw.to?.evaNumber);
+  const toName = toStr(raw.to?.name);
+  const scheduledDep = toStr(raw.scheduledDeparture);
+  const predictedDep = toStr(raw.predictedDeparture);
+  const scheduledArr = toStr(raw.scheduledArrival);
+  const predictedArr = toStr(raw.predictedArrival);
+  const depDelay = toNum(raw.departureDelayMinutes);
+  const arrDelay = toNum(raw.arrivalDelayMinutes);
+
+  if (
+    !trainName ||
+    !fromEva ||
+    !fromName ||
+    !toEva ||
+    !toName ||
+    !scheduledDep ||
+    !predictedDep ||
+    !scheduledArr ||
+    !predictedArr ||
+    depDelay === undefined ||
+    arrDelay === undefined
+  ) {
+    return null;
+  }
+
+  return {
+    trainName,
+    from: { evaNumber: fromEva, name: fromName },
+    to: { evaNumber: toEva, name: toName },
+    scheduledDeparture: scheduledDep,
+    predictedDeparture: predictedDep,
+    scheduledArrival: scheduledArr,
+    predictedArrival: predictedArr,
+    departureDelayMinutes: depDelay,
+    arrivalDelayMinutes: arrDelay,
+  };
+}
+
+function determineSeverity(headline: string): "low" | "medium" | "high" {
+  const upper = headline.toUpperCase();
+  if (
+    upper.includes("STELLWERK") ||
+    upper.includes("PERSONEN IM GLEIS") ||
+    upper.includes("NOTARZT")
+  ) {
+    return "high";
+  }
+  if (
+    upper.includes("WEICHEN") ||
+    upper.includes("SIGNAL") ||
+    upper.includes("OBERLEITUNG")
+  ) {
+    return "medium";
+  }
+  return "low";
 }
 
 // ---------------------------------------------------------------------------
@@ -512,5 +624,105 @@ export class MarudorClient {
     }
 
     return status;
+  }
+
+  // -------------------------------------------------------------------------
+  // searchJourneys — end-to-end routing
+  // -------------------------------------------------------------------------
+
+  /**
+   * Search for journey options between two stations at a given time.
+   * Procedure: bahn.routing
+   * Input: { start, destination, time, searchForDeparture, klasse }
+   * Returns JourneyOption[] with legs mapped from routing response.
+   * Lets upstream 500 (ProviderError with kind:"http") bubble.
+   */
+  async searchJourneys(
+    fromEva: string,
+    toEva: string,
+    isoTime?: string,
+  ): Promise<JourneyOption[]> {
+    const time = isoTime ? new Date(isoTime) : new Date();
+
+    const input: Record<string, unknown> = {
+      start: { type: "stopPlace", evaNumber: fromEva },
+      destination: { type: "stopPlace", evaNumber: toEva },
+      searchForDeparture: true,
+      time,
+      klasse: "KLASSE_2",
+    };
+
+    const raw = await this.rpc.query<unknown>("bahn.routing", input);
+    const resp = raw as RawJourneySearchResponse;
+    const routes = resp.routes ?? [];
+
+    const options: JourneyOption[] = [];
+    for (const route of routes) {
+      const legs = (route.legs ?? [])
+        .map(mapJourneyLeg)
+        .filter((leg) => leg !== null) as JourneyLeg[];
+
+      if (legs.length > 0) {
+        options.push({
+          legs,
+          riskyTransfers: [],
+        });
+      }
+    }
+
+    return options;
+  }
+
+  // -------------------------------------------------------------------------
+  // getDisruptions — HIM messages
+  // -------------------------------------------------------------------------
+
+  /**
+   * Fetch disruption messages (HIM) for a station.
+   * If evaNumber is not provided, returns [] without a network call.
+   * Procedure: iris.departures
+   * Input: { evaNumber }
+   * Extracts messages.him[] from each departure, deduplicates by id.
+   * Maps severity based on headline keywords.
+   */
+  async getDisruptions(filter: { evaNumber?: string }): Promise<Disruption[]> {
+    const { evaNumber } = filter;
+    if (!evaNumber) {
+      return [];
+    }
+
+    const input: Record<string, unknown> = { evaNumber };
+    const raw = await this.rpc.query<unknown>("iris.departures", input);
+    const resp = raw as RawDisruptionsResponse;
+
+    const departures = resp.departures ?? [];
+
+    // Collect all HIM messages and deduplicate by id
+    const himById = new Map<string, Disruption>();
+
+    for (const departure of departures) {
+      const himMessages = departure.messages?.him ?? [];
+      for (const him of himMessages) {
+        const id = toStr(him.id);
+        if (!id) continue;
+
+        // Skip if already added (deduplication by id)
+        if (himById.has(id)) continue;
+
+        const headline = toStr(him.headline) ?? "";
+        const description = toStr(him.text) ?? "";
+
+        himById.set(id, {
+          id,
+          headline,
+          description,
+          severity: determineSeverity(headline),
+          affectedSegments: [],
+          startTime: toStr(him.timestamp),
+        });
+      }
+    }
+
+    return Array.from(himById.values());
   }
 }
