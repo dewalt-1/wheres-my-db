@@ -154,6 +154,31 @@ describe("MarudorClient.findJourney", () => {
         err.source === "marudor",
     );
   });
+
+  it("filters out results whose category doesn't match the requested one", async () => {
+    // Marudor's category param isn't strictly enforced server-side: asking
+    // for "RB 597" can return ICE 597 results. We filter client-side so the
+    // user gets nothing rather than the wrong train.
+    mswServer.use(
+      http.get(`${BASE_URL}/rpc/journey.find`, () => {
+        return new HttpResponse(makeRpcResponse(journeyFindFixture), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    const client = new MarudorClient({ baseUrl: BASE_URL });
+    // The fixture only contains ICE entries; asking for an RB should be filtered out.
+    await expect(
+      client.findJourney("RB 597", "2026-05-18"),
+    ).rejects.toSatisfy(
+      (err: unknown) =>
+        err instanceof ProviderError &&
+        err.kind === "not_found" &&
+        err.source === "marudor",
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

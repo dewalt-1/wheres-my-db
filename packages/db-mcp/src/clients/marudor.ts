@@ -455,12 +455,22 @@ export class MarudorClient {
     const results: TrainIdentifier[] = [];
     for (const entry of raw as RawJourneyFindEntry[]) {
       const mapped = mapJourneyFindEntry(entry, useDate);
-      if (mapped) results.push(mapped);
+      if (!mapped) continue;
+
+      // Marudor's category filter isn't strictly applied server-side: asking
+      // for "RB 10" can return ICE 10. Filter on our side so a user-supplied
+      // category like RB / RE / IC / ICE is honored exactly.
+      if (category) {
+        const entryCategory = toStr(entry.train?.category)?.toUpperCase();
+        if (entryCategory !== category.toUpperCase()) continue;
+      }
+
+      results.push(mapped);
     }
 
     if (results.length === 0) {
       throw new ProviderError(
-        `No valid journey IDs found for "${trainName}" on ${useDate}`,
+        `No ${category ?? ""} train numbered ${journeyNumber} found for ${useDate}`.replace(/\s+/g, " ").trim(),
         "marudor",
         "not_found",
       );
