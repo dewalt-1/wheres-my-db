@@ -1,14 +1,14 @@
 # Where's My DB?
 
-*A Claude skill + MCP server that catches Deutsche Bahn delays before the official board does.*
+*A Claude skill + MCP server that tells you **how** Deutsche Bahn delays will affect your trip — not just whether your train is late.*
 
 ---
 
-## The problem
+## What it does
 
-Deutsche Bahn's apps say *"on time"* — until they don't. The data you'd need to predict the delay sooner is technically public: the same train running 18 minutes late at its previous stop, a connecting train that's already in trouble, a Stellwerksstörung on your corridor. None of it is synthesized for the passenger.
+Knowing a train is "5 min late" isn't useful. Knowing that the 12-minute delay three stops up the line will eat your 9-minute transfer in Berlin — that's useful.
 
-**Where's My DB?** synthesizes it. You ask Claude *"is ICE 597 on time?"* and instead of repeating the board, the agent calls live data, reads upstream-stop delays, walks the connection chain, checks for disruptions, and gives you a real-money answer like:
+**Where's My DB?** turns *"is my train on time?"* into a real answer. You ask Claude in plain language and it walks the upstream stops, traces the connection chain, and tells you which delays actually affect *your* journey:
 
 > **Likely 15–18 minutes late.**
 > - ICE 597 was already 18 min late at Solingen Hbf (three stops upstream) at 15:42.
@@ -16,6 +16,9 @@ Deutsche Bahn's apps say *"on time"* — until they don't. The data you'd need t
 > - Your Frankfurt connection (ICE 599) is currently on time — you'd lose ~14 min of a 16-min transfer.
 >
 > *Caveat: a single 5-min recovery en route can change this. The official board hasn't updated yet.*
+
+<!-- Drop your screenshot here, e.g.: -->
+<!-- ![demo](docs/demo.png) -->
 
 See [`examples/`](./examples/) for three full transcripts.
 
