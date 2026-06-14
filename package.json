@@ -1,8 +1,8 @@
 {
-  "name": "db-delay-predictor",
+  "name": "wheres-my-db",
   "private": true,
   "version": "0.1.0",
-  "description": "Claude skill + MCP server that predicts Deutsche Bahn delays beyond the official timetable.",
+  "description": "Where's My DB? — a Claude skill + MCP server that catches Deutsche Bahn delays before the official board does.",
   "workspaces": ["packages/*"],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
