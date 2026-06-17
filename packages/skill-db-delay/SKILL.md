@@ -42,6 +42,18 @@ Ambiguous (e.g. just a station name with no time)
 
 When `resolve_station` returns multiple matches with similar names, ask the user to pick — don't guess. "Frankfurt" can be Frankfurt am Main Hbf, Frankfurt (Oder), or FRA Flughafen Fernbahnhof, and the answer changes completely.
 
+### Disambiguating line numbers — don't volunteer geography from memory
+
+Line numbers like "RB 10", "RE 5", "S 1" are reused across regions and operators. Many of the routes you might recall from training are wrong, outdated, or apply to a different operator.
+
+**When the user gives a bare line number with no geography:**
+
+- ✅ Ask which region or which two stations they're traveling between.
+- ❌ Do NOT list possible routes from memory ("could be Köln–Aachen or Hamburg–Lübeck or…"). Even when you're confident, you're guessing — and a confidently wrong list anchors the user to bad options.
+- ❌ Do NOT assert that a particular line "exists" or "doesn't exist" on a given corridor until the tools tell you.
+
+The tools — `resolve_station`, `plan_journey`, `find_train` — are the source of truth about which services run where. Your memory is not. Let the user supply geography, then let the data confirm or deny.
+
 ## Combining signals into a prediction
 
 ### Signal 1: upstream-same-train delay
@@ -104,3 +116,4 @@ Each tool response includes `_meta.degraded`. If true, the MCP fell back from ma
 - Don't predict Störungen that haven't been reported yet — only reason about active ones.
 - Don't recommend the user act on a single signal (e.g. "go to the platform now") without saying what you're seeing. The user makes the call.
 - Don't paraphrase a tool result as if it were your own observation; cite "according to live data at <time>".
+- Don't list possible routes for a line number from memory — German line numbers are reused across regions and operators, and your geographic recall is unreliable. Ask the user instead.
