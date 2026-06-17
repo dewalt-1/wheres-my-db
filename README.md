@@ -17,8 +17,7 @@ Knowing a train is "5 min late" isn't useful. Knowing that the 12-minute delay t
 >
 > *Caveat: a single 5-min recovery en route can change this. The official board hasn't updated yet.*
 
-<!-- Drop your screenshot here, e.g.: -->
-<!-- ![demo](docs/demo.png) -->
+![demo](docs/demo.png)
 
 See [`examples/`](./examples/) for three full transcripts.
 
