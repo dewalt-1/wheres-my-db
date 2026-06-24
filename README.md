@@ -107,6 +107,70 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 Then symlink the skill the same way and fully quit + relaunch Claude Desktop.
 
+### Wire into Codex CLI
+
+OpenAI's Codex CLI speaks MCP. Edit `~/.codex/config.toml` (create it if missing) and add:
+
+```toml
+[mcp_servers.db-mcp]
+command = "node"
+args = ["/absolute/path/to/wheres-my-db/packages/db-mcp/dist/index.js"]
+```
+
+Restart `codex`. The 5 tools (`resolve_station`, `find_train`, `get_train_status`, `plan_journey`, `get_disruptions`) become callable from any session.
+
+Codex doesn't load `SKILL.md` automatically. To get the reasoning playbook, paste the contents of `packages/skill-db-delay/SKILL.md` into your project's `AGENTS.md` or the Codex system-prompt equivalent. (Verify the exact mechanism against current Codex docs — the config schema has shifted across versions.)
+
+### Wire into opencode
+
+[opencode](https://opencode.ai) also speaks MCP. Edit `~/.config/opencode/opencode.json` (global) or a project-local `opencode.json`:
+
+```json
+{
+  "mcp": {
+    "db-mcp": {
+      "type": "local",
+      "command": ["node", "/absolute/path/to/wheres-my-db/packages/db-mcp/dist/index.js"],
+      "enabled": true
+    }
+  }
+}
+```
+
+Restart opencode. Same 5 tools become available.
+
+For the reasoning playbook: copy the body of `packages/skill-db-delay/SKILL.md` into your project's `AGENTS.md` (opencode's instruction file) or use it as the system prompt.
+
+### Wire into Hermes Agent
+
+[Hermes Agent](https://github.com/NousResearch/hermes-agent) by Nous Research speaks MCP natively and — unlike Codex and opencode — supports the [agentskills.io](https://agentskills.io) open standard, which is the same format `SKILL.md` uses. The skill auto-loads, no system-prompt copy-paste needed.
+
+Add the MCP to `~/.hermes/config.yaml`:
+
+```yaml
+mcp_servers:
+  db-mcp:
+    command: "node"
+    args: ["/absolute/path/to/wheres-my-db/packages/db-mcp/dist/index.js"]
+```
+
+Then install the skill by symlinking the same way as for Claude:
+
+```bash
+mkdir -p ~/.hermes/skills
+ln -s "$PWD/packages/skill-db-delay" ~/.hermes/skills/db-delay-predictor
+```
+
+Run `hermes chat` and ask:
+
+```
+Is ICE 597 on time today?
+```
+
+### Any other MCP client
+
+The server is a stdio MCP — it speaks JSON-RPC over stdin/stdout per the [Model Context Protocol spec](https://modelcontextprotocol.io). Any client that implements MCP can use it. The shape is always roughly the same: a command + args pointing at `packages/db-mcp/dist/index.js`. The skill is Claude-specific in its frontmatter format, but its prose transfers cleanly into any system-prompt or custom-instructions slot.
+
 ---
 
 ## Repo layout
