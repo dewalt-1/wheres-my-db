@@ -5,7 +5,7 @@
 export class ProviderError extends Error {
   constructor(
     message: string,
-    public readonly source: "marudor" | "db-rest",
+    public readonly source: "marudor" | "db-rest" | "dwd",
     public readonly kind: "timeout" | "http" | "parse" | "not_found",
     cause?: unknown,
   ) {

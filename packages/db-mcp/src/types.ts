@@ -2,7 +2,7 @@
 // whether the data came from marudor or db-rest. Each provider client maps
 // its own response shape into these types.
 
-export type DataSource = "marudor" | "db-rest";
+export type DataSource = "marudor" | "db-rest" | "dwd";
 
 export interface SourcedResponse<T> {
   data: T;
@@ -95,4 +95,20 @@ export interface Disruption {
   affectedSegments: string[];
   startTime?: string;
   expectedEndTime?: string;
+}
+
+/** A weather warning from DWD (Deutscher Wetterdienst). */
+export interface WeatherWarning {
+  /** DWD event code, e.g. "HITZE", "GEWITTER", "STURM", "SCHNEE". */
+  type: string;
+  /** DWD's official severity: 1 = advisory, 2 = severe, 3 = very severe, 4 = extreme. */
+  level: 1 | 2 | 3 | 4;
+  headline: string;
+  description: string;
+  /** ISO 8601 timestamp when the warning starts being valid. */
+  start: string;
+  /** ISO 8601 timestamp when the warning expires. */
+  end: string;
+  /** DWD's human-readable area name, e.g. "Stadt Köln". */
+  areaName: string;
 }
