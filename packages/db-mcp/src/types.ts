@@ -16,6 +16,7 @@ export interface Station {
   name: string;
   /** Lower is better — caller can sort or pick top match. */
   matchScore?: number;
+  position?: { lat: number; lon: number };
 }
 
 export interface TrainIdentifier {

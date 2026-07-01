@@ -10,17 +10,23 @@ import { ZodError } from "zod";
 import { MarudorClient } from "./clients/marudor.js";
 import { DbRestClient } from "./clients/db-rest.js";
 import { ProviderRouter } from "./clients/provider.js";
+import { WeatherClient } from "./clients/weather.js";
 import { createCache } from "./cache.js";
+import { ProviderError } from "./errors.js";
 import { makeResolveStationTool } from "./tools/resolve_station.js";
 import { makeFindTrainTool } from "./tools/find_train.js";
 import { makeGetTrainStatusTool } from "./tools/get_train_status.js";
 import { makePlanJourneyTool } from "./tools/plan_journey.js";
 import { makeGetDisruptionsTool } from "./tools/get_disruptions.js";
+import { makeGetWeatherRiskTool } from "./tools/get_weather_risk.js";
 import { asError, asResult } from "./tools/runtime.js";
-import type { SourcedResponse } from "./types.js";
+import type { SourcedResponse, WeatherWarning } from "./types.js";
 
 export interface CreateServerOptions {
-  providers?: { router: ProviderRouter };
+  providers?: {
+    router: ProviderRouter;
+    weather: Pick<WeatherClient, "getWarningsForStation">;
+  };
 }
 
 export interface ServerHandle {
@@ -30,7 +36,9 @@ export interface ServerHandle {
 }
 
 export function createServer(opts: CreateServerOptions = {}): ServerHandle {
-  const router = opts.providers?.router ?? buildDefaultRouter();
+  const providers = opts.providers ?? buildDefaultProviders();
+  const router = providers.router;
+  const weather = providers.weather;
 
   const tools = [
     makeResolveStationTool(router),
@@ -38,6 +46,7 @@ export function createServer(opts: CreateServerOptions = {}): ServerHandle {
     makeGetTrainStatusTool(router),
     makePlanJourneyTool(router),
     makeGetDisruptionsTool(router),
+    makeGetWeatherRiskTool(weather as WeatherClient),
   ];
   const byName = new Map(tools.map((t) => [t.spec.name, t]));
 
@@ -70,11 +79,55 @@ export function createServer(opts: CreateServerOptions = {}): ServerHandle {
   return { server, listTools, callTool };
 }
 
-function buildDefaultRouter(): ProviderRouter {
+function buildDefaultProviders(): {
+  router: ProviderRouter;
+  weather: WeatherClient;
+} {
   const marudor = new MarudorClient();
   const dbRest = new DbRestClient();
-  const router = new ProviderRouter(marudor, dbRest);
-  return wrapWithCache(router);
+  const baseRouter = new ProviderRouter(marudor, dbRest);
+  const router = wrapWithCache(baseRouter);
+
+  const baseWeather = new WeatherClient({
+    stationResolver: async (evaNumber: string) => {
+      // Reuse marudor station search to get lat/lon for an EVA number.
+      // Picks the first result whose evaNumber matches exactly.
+      const stations = await marudor.searchStations(evaNumber);
+      const match = stations.find((s) => s.evaNumber === evaNumber);
+      if (!match) {
+        throw new ProviderError(
+          `Could not resolve coordinates for station ${evaNumber}`,
+          "dwd",
+          "not_found",
+        );
+      }
+      const pos = match.position;
+      if (!pos) {
+        throw new ProviderError(
+          `Station ${evaNumber} has no coordinates`,
+          "dwd",
+          "not_found",
+        );
+      }
+      return { lat: pos.lat, lon: pos.lon, name: match.name };
+    },
+  });
+  const weather = wrapWeatherWithCache(baseWeather);
+
+  return { router, weather };
+}
+
+function wrapWeatherWithCache(client: WeatherClient): WeatherClient {
+  const cache = createCache<{
+    stationCoordinates: { lat: number; lon: number; name: string };
+    warnings: WeatherWarning[];
+  }>({ max: 200, ttlMs: 5 * 60 * 1000 });
+  const original = client.getWarningsForStation.bind(client);
+  client.getWarningsForStation = (eva: string, atTime?: string) => {
+    const key = `weather:${eva}:${atTime ?? "now"}`;
+    return cache.getOrCompute(key, () => original(eva, atTime));
+  };
+  return client;
 }
 
 function wrapWithCache(router: ProviderRouter): ProviderRouter {

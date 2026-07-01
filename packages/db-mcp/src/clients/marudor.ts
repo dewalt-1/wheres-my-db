@@ -383,7 +383,14 @@ export class MarudorClient {
         typeof item.evaNumber === "string" ? item.evaNumber : undefined;
       const name = typeof item.name === "string" ? item.name : undefined;
       if (evaNumber && name) {
-        stations.push({ evaNumber, name });
+        const rawPos = item.position;
+        const position =
+          rawPos &&
+          typeof rawPos.latitude === "number" &&
+          typeof rawPos.longitude === "number"
+            ? { lat: rawPos.latitude, lon: rawPos.longitude }
+            : undefined;
+        stations.push({ evaNumber, name, ...(position ? { position } : {}) });
       }
     }
     return stations;
