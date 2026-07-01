@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "../setup.js";
 import { WeatherClient } from "../../src/clients/weather.js";
+import { ProviderError } from "../../src/errors.js";
 import dwdFixture from "../fixtures/dwd-warnings.json" with { type: "json" };
 import dwdEmptyFixture from "../fixtures/dwd-warnings-empty.json" with { type: "json" };
 
@@ -204,5 +205,108 @@ describe("WeatherClient filtering", () => {
       "2026-07-15T12:00:00.000Z",
     );
     expect(result.warnings).toEqual([]);
+  });
+});
+
+describe("WeatherClient error paths", () => {
+  it("throws ProviderError(http) on HTTP 5xx", async () => {
+    mswServer.use(
+      http.get(
+        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
+        () => new HttpResponse("upstream boom", { status: 503 }),
+      ),
+      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
+    );
+    const client = new WeatherClient({
+      baseUrl: BASE_URL,
+      stationResolver: fakeResolver,
+    });
+    await expect(
+      client.getWarningsForStation("8000207"),
+    ).rejects.toSatisfy(
+      (err: unknown) =>
+        err instanceof ProviderError &&
+        err.source === "dwd" &&
+        err.kind === "http",
+    );
+  });
+
+  it("throws ProviderError(timeout) when the request exceeds timeoutMs", async () => {
+    mswServer.use(
+      http.get(
+        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
+        async () => {
+          // Delay longer than the client's timeoutMs.
+          await new Promise((r) => setTimeout(r, 200));
+          return new HttpResponse(jsonpWrap(dwdFixture), { status: 200 });
+        },
+      ),
+      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
+    );
+    const client = new WeatherClient({
+      baseUrl: BASE_URL,
+      stationResolver: fakeResolver,
+      timeoutMs: 50,
+    });
+    await expect(
+      client.getWarningsForStation("8000207"),
+    ).rejects.toSatisfy(
+      (err: unknown) =>
+        err instanceof ProviderError &&
+        err.source === "dwd" &&
+        err.kind === "timeout",
+    );
+  });
+
+  it("throws ProviderError(parse) on non-JSON body", async () => {
+    mswServer.use(
+      http.get(
+        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
+        () =>
+          new HttpResponse("warnWetter.loadWarnings(not-json-at-all);", {
+            status: 200,
+            headers: { "Content-Type": "application/javascript" },
+          }),
+      ),
+      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
+    );
+    const client = new WeatherClient({
+      baseUrl: BASE_URL,
+      stationResolver: fakeResolver,
+    });
+    await expect(
+      client.getWarningsForStation("8000207"),
+    ).rejects.toSatisfy(
+      (err: unknown) =>
+        err instanceof ProviderError &&
+        err.source === "dwd" &&
+        err.kind === "parse",
+    );
+  });
+
+  it("throws ProviderError(not_found) when stationResolver throws", async () => {
+    // Note: WeatherClient does not currently translate resolver errors —
+    // it lets them propagate. This test confirms behavior. If translation
+    // is desired (e.g., wrap into ProviderError(not_found)), update the
+    // client in this step and adjust the assertion.
+    mswServer.use(
+      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
+    );
+    const failingResolver = () =>
+      Promise.reject(
+        new ProviderError("station not found", "dwd", "not_found"),
+      );
+    const client = new WeatherClient({
+      baseUrl: BASE_URL,
+      stationResolver: failingResolver,
+    });
+    await expect(
+      client.getWarningsForStation("nonexistent"),
+    ).rejects.toSatisfy(
+      (err: unknown) =>
+        err instanceof ProviderError &&
+        err.source === "dwd" &&
+        err.kind === "not_found",
+    );
   });
 });
