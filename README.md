@@ -88,7 +88,7 @@ claude mcp add db-mcp -s user -- node "$PWD/packages/db-mcp/dist/index.js"
 ln -s "$PWD/packages/skill-db-delay" ~/.claude/skills/db-delay-predictor
 ```
 
-Open a `claude` session, run `/mcp` to confirm `db-mcp` is connected with 5 tools, then ask:
+Open a `claude` session, run `/mcp` to confirm `db-mcp` is connected with 6 tools, then ask:
 
 ```
 Is ICE 597 on time today?
@@ -121,7 +121,7 @@ command = "node"
 args = ["/absolute/path/to/wheres-my-db/packages/db-mcp/dist/index.js"]
 ```
 
-Restart `codex`. The 5 tools (`resolve_station`, `find_train`, `get_train_status`, `plan_journey`, `get_disruptions`) become callable from any session.
+Restart `codex`. The 6 tools (`resolve_station`, `find_train`, `get_train_status`, `plan_journey`, `get_disruptions`, `get_weather_risk`) become callable from any session.
 
 Codex doesn't load `SKILL.md` automatically. To get the reasoning playbook, paste the contents of `packages/skill-db-delay/SKILL.md` into your project's `AGENTS.md` or the Codex system-prompt equivalent. (Verify the exact mechanism against current Codex docs — the config schema has shifted across versions.)
 
@@ -141,7 +141,7 @@ Codex doesn't load `SKILL.md` automatically. To get the reasoning playbook, past
 }
 ```
 
-Restart opencode. Same 5 tools become available.
+Restart opencode. Same 6 tools become available.
 
 For the reasoning playbook: copy the body of `packages/skill-db-delay/SKILL.md` into your project's `AGENTS.md` (opencode's instruction file) or use it as the system prompt.
 
