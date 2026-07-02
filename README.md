@@ -43,6 +43,9 @@ See [`examples/`](./examples/) for three full transcripts.
 │  │ marudor (primary)   │ →  │ db-rest (fallback)  │      │
 │  │ tRPC + devalue      │    │ plain REST          │      │
 │  └─────────────────────┘    └─────────────────────┘      │
+│  ┌─────────────────────────────────────────────────┐     │
+│  │ DWD weather warnings (independent source)       │     │
+│  └─────────────────────────────────────────────────┘     │
 │  + 5-min in-memory LRU cache                             │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -60,8 +63,9 @@ Both are independently testable. Both ship in this repo.
 
 - **The primary data source isn't a public REST API.** Marudor (the community DB tracker) runs internal tRPC with custom [devalue](https://github.com/Rich-Harris/devalue) encoding. The MCP includes a hand-rolled tRPC transport that speaks it, because no public alternative exposes per-stop connection-chain data ("will my Anschluss be held?") — which is the whole point.
 - **Transparent fallback to a stable REST API.** If marudor fails (it's an unofficial endpoint), the MCP transparently falls back to [db-rest](https://github.com/derhuerst/db-rest), and the skill tells the user the answer is degraded. Belt-and-suspenders engineering, not a hedge.
+- **External weather context.** A separate `WeatherClient` pulls live warnings from DWD (Deutscher Wetterdienst) — heatwave, storm, snow — so the agent can explain delays the DB feed hasn't acknowledged yet, and proactively warn about future trips through affected corridors.
 - **The skill is honest about uncertainty.** Delay predictions are rounded to 5-minute buckets ("about 10–15 minutes late") because precision would be theater. The skill explicitly enumerates which signals fired and what could change.
-- **5 atomic MCP tools, no reasoning baked in.** `resolve_station`, `find_train`, `get_train_status`, `plan_journey`, `get_disruptions`. The skill composes them.
+- **6 atomic MCP tools, no reasoning baked in.** `resolve_station`, `find_train`, `get_train_status`, `plan_journey`, `get_disruptions`, `get_weather_risk`. The skill composes them.
 - **52 tests, mostly with mocked HTTP.** Includes failure modes: timeout → fallback, both providers down → clean error, partial failure on a single stop's connection chain doesn't break the whole call.
 
 ---
@@ -222,6 +226,7 @@ Known limitations:
 
 - [marudor / bahn.expert](https://bahn.expert) — the data source that makes the connection-chain feature possible. Without it this project doesn't exist.
 - [db-rest](https://github.com/derhuerst/db-rest) by Jannis R — the stable REST fallback.
+- [DWD (Deutscher Wetterdienst)](https://www.dwd.de) — Germany's official weather service. Their public warnings JSON drives the weather-context signal.
 
 ## License
 
