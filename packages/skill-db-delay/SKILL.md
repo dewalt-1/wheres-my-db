@@ -86,6 +86,22 @@ When the route crosses a known trouble corridor, call `get_disruptions` for eith
 
 These are heuristics, not facts. Say so in the response.
 
+### Signal 5: weather (DWD warnings)
+
+When the DB feed shows delays without an obvious cause — no upstream-stop delay, no Störungsmeldung, no connection issue — call `get_weather_risk(evaNumber)` for the affected stations. Active DWD warnings often explain what DB itself hasn't acknowledged yet. Use `atTime` to check warnings active at a planned future departure.
+
+| DWD warning type | Likely rail impact |
+|---|---|
+| `HITZE` level 3+ | Track buckling risk on jointed-rail segments. Speed restrictions on long-distance corridors. AC failures common in older rolling stock — affects passenger experience even if not delays. |
+| `GEWITTER` level 2+ | Overhead-line damage risk. Brief station closures during lightning. Cascading delays as crews respond. |
+| `STURM` / `ORKAN` | Tree-on-track risk; often triggers regional service suspensions. |
+| `STARKREGEN` level 3+ | Flooding on cuttings and underpasses. Localized line closures. |
+| `SCHNEE` / `GLATTEIS` | Switch/Weichen freeze risk. S-Bahn and regional services hit first. |
+
+Use weather **proactively** when planning a future trip ("tomorrow morning Köln → München"): call `get_weather_risk` with `atTime` set to the planned departure. If a HITZE level 3 warning is active across the corridor, surface it: *"DWD has issued a level-3 heat warning along your route — expect speed restrictions and possible AC issues."*
+
+Treat weather warnings as **explanatory context**, not direct delay predictions. The skill never says "you will be 15 min late because of heat" — it says "active heat warning may explain the delay" or "expect possible disruption on this corridor today."
+
 ## Expressing confidence
 
 Every prediction must include:
@@ -109,6 +125,8 @@ Example:
 Each tool response includes `_meta.degraded`. If true, the MCP fell back from marudor to db-rest, which exposes less data (notably: no per-stop connection chain, no real disruption messages, no train-name lookup). Say so explicitly:
 
 > _I'm running on the db-rest fallback right now, so I can't see connection-chain data or Störungsmeldungen. The on-time prediction is based only on the train's per-stop delays._
+
+If `get_weather_risk` returns `warningsUnavailable: true`, say so plainly: *"I couldn't reach the weather service this time, so I can't factor in weather context."* Don't silently omit — the user should know which signals fired and which didn't.
 
 ## Don'ts
 
