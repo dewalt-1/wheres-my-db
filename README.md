@@ -66,7 +66,6 @@ Both are independently testable. Both ship in this repo.
 - **External weather context.** A separate `WeatherClient` pulls live warnings from DWD (Deutscher Wetterdienst) — heatwave, storm, snow — so the agent can explain delays the DB feed hasn't acknowledged yet, and proactively warn about future trips through affected corridors.
 - **The skill is honest about uncertainty.** Delay predictions are rounded to 5-minute buckets ("about 10–15 minutes late") because precision would be theater. The skill explicitly enumerates which signals fired and what could change.
 - **6 atomic MCP tools, no reasoning baked in.** `resolve_station`, `find_train`, `get_train_status`, `plan_journey`, `get_disruptions`, `get_weather_risk`. The skill composes them.
-- **52 tests, mostly with mocked HTTP.** Includes failure modes: timeout → fallback, both providers down → clean error, partial failure on a single stop's connection chain doesn't break the whole call.
 
 ---
 
@@ -202,23 +201,7 @@ examples/                    saved demo transcripts
 npm test
 ```
 
-52 tests across cache, provider clients, fallback routing, tool wrappers, and server wiring. Network calls are mocked via [msw](https://mswjs.io); failure modes (timeout, 5xx, partial collapse) are part of the test surface, not afterthoughts.
-
----
-
-## Status
-
-**v0.1** — usable. Connection-chain prediction works end-to-end against live marudor data.
-
-Known limitations:
-- Marudor's internal tRPC isn't a public contract; if they change it, the MCP will fall back to db-rest automatically with degraded data and the skill will tell you so.
-- `bahn.routing` (the journey-search procedure inside marudor) occasionally returns 5xx upstream from DB itself; this is reflected as a transparent fallback to db-rest's `/journeys`.
-
-## Stretch goals (not in v0.1)
-
-- **Loop skill** for monitoring a specific train at an interval.
-- **Hosted HTTP MCP** with SSE transport, so it can be added by URL instead of cloned.
-- **Historical baseline collector** — per-train on-time stats over weeks, used as a fifth prediction signal.
+Tests cover cache, provider clients, fallback routing, tool wrappers, and server wiring. Network calls are mocked via [msw](https://mswjs.io); failure modes (timeout, 5xx, partial collapse) are part of the test surface, not afterthoughts.
 
 ---
 
