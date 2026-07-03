@@ -199,8 +199,9 @@ export class WeatherClient {
    * warncellId (string) to polygon centroid coordinates.
    *
    * The catalog is requested once and stored in this.wfsCentroidCache.
-   * If the fetch fails, an empty map is returned so coordinate filtering
-   * is effectively bypassed rather than crashing the whole request.
+   * If the fetch fails, an empty map is returned for that call only (not cached),
+   * so coordinate filtering is effectively bypassed rather than crashing the whole
+   * request. The cache stays null so subsequent calls will retry.
    */
   private async getWfsCentroids(): Promise<
     Map<string, { lat: number; lon: number }>
@@ -218,15 +219,15 @@ export class WeatherClient {
     try {
       const res = await fetch(url, { signal: controller.signal });
       if (!res.ok) {
-        // Non-fatal: fall back to no coordinate filtering.
-        this.wfsCentroidCache = new Map();
-        return this.wfsCentroidCache;
+        // Non-fatal: return empty map for this call only, do not cache.
+        // Leave this.wfsCentroidCache null so next call retries.
+        return new Map();
       }
       collection = (await res.json()) as WfsFeatureCollection;
     } catch {
-      // Network error or abort — fall back gracefully.
-      this.wfsCentroidCache = new Map();
-      return this.wfsCentroidCache;
+      // Network error or abort — return empty map for this call only, do not cache.
+      // Leave this.wfsCentroidCache null so next call retries.
+      return new Map();
     } finally {
       clearTimeout(timer);
     }

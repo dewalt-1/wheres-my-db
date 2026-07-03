@@ -209,6 +209,101 @@ describe("WeatherClient filtering", () => {
 });
 
 describe("WeatherClient error paths", () => {
+  it("does not poison the cache if WFS fails with 5xx", async () => {
+    // First call: WFS returns 503 → no filtering, all warnings returned
+    mswServer.use(
+      http.get(
+        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
+        () =>
+          new HttpResponse(jsonpWrap(dwdFixture), {
+            status: 200,
+            headers: { "Content-Type": "application/javascript" },
+          }),
+      ),
+      http.get(WFS_PATH, () => new HttpResponse("boom", { status: 503 })),
+    );
+    const client = new WeatherClient({
+      baseUrl: BASE_URL,
+      wfsBaseUrl: WFS_BASE_URL,
+      stationResolver: fakeResolver,
+    });
+    const first = await client.getWarningsForStation(
+      "8000207",
+      "2026-07-15T12:00:00.000Z",
+    );
+    // Without coordinate filtering, all warnings in the fixture are kept
+    expect(first.warnings.length).toBe(3);
+
+    // Second call: WFS now succeeds, filtering should kick in
+    mswServer.use(
+      http.get(
+        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
+        () =>
+          new HttpResponse(jsonpWrap(dwdFixture), {
+            status: 200,
+            headers: { "Content-Type": "application/javascript" },
+          }),
+      ),
+      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
+    );
+    const second = await client.getWarningsForStation(
+      "8000207",
+      "2026-07-15T12:00:00.000Z",
+    );
+    // Now coordinate filtering works: only Köln-area warning survives
+    expect(second.warnings.length).toBe(1);
+  });
+
+  it("does not poison the cache if WFS times out", async () => {
+    // First call: WFS times out → no filtering, all warnings returned
+    mswServer.use(
+      http.get(
+        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
+        () =>
+          new HttpResponse(jsonpWrap(dwdFixture), {
+            status: 200,
+            headers: { "Content-Type": "application/javascript" },
+          }),
+      ),
+      http.get(WFS_PATH, async () => {
+        // Delay longer than the client's timeoutMs
+        await new Promise((r) => setTimeout(r, 200));
+        return HttpResponse.json(makeWfsStub());
+      }),
+    );
+    const client = new WeatherClient({
+      baseUrl: BASE_URL,
+      wfsBaseUrl: WFS_BASE_URL,
+      stationResolver: fakeResolver,
+      timeoutMs: 50,
+    });
+    const first = await client.getWarningsForStation(
+      "8000207",
+      "2026-07-15T12:00:00.000Z",
+    );
+    // Without coordinate filtering, all warnings in the fixture are kept
+    expect(first.warnings.length).toBe(3);
+
+    // Second call: WFS now succeeds, filtering should kick in
+    mswServer.use(
+      http.get(
+        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
+        () =>
+          new HttpResponse(jsonpWrap(dwdFixture), {
+            status: 200,
+            headers: { "Content-Type": "application/javascript" },
+          }),
+      ),
+      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
+    );
+    const second = await client.getWarningsForStation(
+      "8000207",
+      "2026-07-15T12:00:00.000Z",
+    );
+    // Now coordinate filtering works: only Köln-area warning survives
+    expect(second.warnings.length).toBe(1);
+  });
+
   it("throws ProviderError(http) on HTTP 5xx", async () => {
     mswServer.use(
       http.get(
