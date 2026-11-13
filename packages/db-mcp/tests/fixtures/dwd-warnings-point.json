@@ -1,0 +1,18 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "EVENT": "FROST",
+    "SEVERITY": "Minor",
+    "HEADLINE": "Amtliche WARNUNG vor FROST",
+    "DESCRIPTION": "Es tritt leichter Frost zwischen -1 °C und -4 °C auf.",
+    "ONSET": "2026-11-13T19:00:00Z",
+    "EXPIRES": "2026-11-14T08:00:00Z",
+    "AREADESC": "Kreis und Stadt München",
+    "GC_WARNCELLID": 909184999
+   }
+  }
+ ]
+}

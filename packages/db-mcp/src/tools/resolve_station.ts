@@ -1,18 +1,17 @@
 import { z } from "zod";
-import type { ProviderRouter } from "../clients/provider.js";
-import type { Station, SourcedResponse } from "../types.js";
-import type { ToolDef } from "./runtime.js";
+import type { TransitousClient } from "../clients/transitous.js";
+import type { SourcedResponse, Station } from "../types.js";
 
 const Input = z.object({
   query: z.string().min(1, "query must not be empty"),
 });
 
-export function makeResolveStationTool(router: ProviderRouter): ToolDef<z.infer<typeof Input>> {
+export function makeResolveStationTool(client: Pick<TransitousClient, "searchStations">) {
   return {
     spec: {
       name: "resolve_station",
       description:
-        "Resolve a fuzzy station name (e.g. 'Koeln Hbf', 'Frankfurt') to candidate stations with EVA numbers. Returns multiple matches; the caller picks or disambiguates.",
+        "Resolve a station name (e.g. 'Köln Hbf', 'Frankfurt') to candidate stations with an id and coordinates. Returns several matches, best first; the caller picks or asks the user. Pass the id unchanged to the other tools.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -23,7 +22,9 @@ export function makeResolveStationTool(router: ProviderRouter): ToolDef<z.infer<
       },
     },
     schema: Input,
-    handler: async ({ query }: z.infer<typeof Input>): Promise<SourcedResponse<Station[]>> =>
-      router.searchStations(query),
+    handler: async ({ query }: z.infer<typeof Input>): Promise<SourcedResponse<Station[]>> => ({
+      data: await client.searchStations(query),
+      source: "transitous",
+    }),
   };
 }

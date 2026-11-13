@@ -1,0 +1,139 @@
+{
+ "stopTimes": [
+  {
+   "mode": "HIGHSPEED_RAIL",
+   "realTime": true,
+   "headsign": "Frankfurt (Main) Hauptbahnhof",
+   "tripId": "20261113_11:52_de-DELFI_3478820016",
+   "displayName": "ICE 153",
+   "routeShortName": "78",
+   "tripShortName": "ICE 153",
+   "cancelled": false,
+   "tripCancelled": false,
+   "place": {
+    "name": "Köln Hbf",
+    "stopId": "de-DELFI_de:05315:11201",
+    "lat": 50.94303,
+    "lon": 6.958729000000001,
+    "arrival": "2026-11-13T12:24:00Z",
+    "departure": "2026-11-13T12:29:00Z",
+    "scheduledArrival": "2026-11-13T12:20:00Z",
+    "scheduledDeparture": "2026-11-13T12:28:00Z",
+    "track": "5 A-C",
+    "cancelled": false
+   }
+  },
+  {
+   "mode": "SUBURBAN",
+   "realTime": true,
+   "headsign": "Kerpen Horrem Bf",
+   "tripId": "20261113_12:20_de-DELFI_3478292581",
+   "displayName": "S12",
+   "routeShortName": "S12",
+   "tripShortName": "032275",
+   "cancelled": false,
+   "tripCancelled": false,
+   "place": {
+    "name": "Köln Hbf",
+    "stopId": "de-DELFI_de:05315:11201",
+    "lat": 50.94303,
+    "lon": 6.958729000000001,
+    "arrival": "2026-11-13T12:30:00Z",
+    "departure": "2026-11-13T12:31:00Z",
+    "scheduledArrival": "2026-11-13T12:29:00Z",
+    "scheduledDeparture": "2026-11-13T12:30:00Z",
+    "cancelled": false
+   }
+  },
+  {
+   "mode": "HIGHSPEED_RAIL",
+   "realTime": true,
+   "headsign": "Interlaken West",
+   "tripId": "20261113_08:25_de-DELFI_3478812875",
+   "displayName": "ICE 107",
+   "routeShortName": "43",
+   "tripShortName": "ICE 107",
+   "cancelled": false,
+   "tripCancelled": false,
+   "place": {
+    "name": "Köln Hbf",
+    "stopId": "de-DELFI_de:05315:11201:7:76",
+    "lat": 50.94332,
+    "lon": 6.958548,
+    "arrival": "2026-11-13T12:28:00Z",
+    "departure": "2026-11-13T12:34:00Z",
+    "scheduledArrival": "2026-11-13T11:50:00Z",
+    "scheduledDeparture": "2026-11-13T11:56:00Z",
+    "track": "6",
+    "scheduledTrack": "88",
+    "cancelled": false
+   }
+  },
+  {
+   "mode": "SUBURBAN",
+   "realTime": true,
+   "headsign": "Troisdorf Bf",
+   "tripId": "20261113_12:43_de-DELFI_3478290897",
+   "displayName": "S19",
+   "routeShortName": "S19",
+   "tripShortName": "031076",
+   "cancelled": false,
+   "tripCancelled": false,
+   "place": {
+    "name": "Köln Hbf",
+    "stopId": "de-DELFI_de:05315:11201",
+    "lat": 50.94303,
+    "lon": 6.958729000000001,
+    "arrival": "2026-11-13T12:36:00Z",
+    "departure": "2026-11-13T12:37:00Z",
+    "scheduledArrival": "2026-11-13T12:20:00Z",
+    "scheduledDeparture": "2026-11-13T12:21:00Z",
+    "cancelled": false
+   }
+  },
+  {
+   "mode": "REGIONAL_RAIL",
+   "realTime": true,
+   "headsign": "Aachen, Hbf",
+   "tripId": "20261113_10:20_de-DELFI_3478667113",
+   "displayName": "RE1 (26814)",
+   "routeShortName": "RE1",
+   "tripShortName": "026814",
+   "cancelled": false,
+   "tripCancelled": false,
+   "place": {
+    "name": "Köln Hbf",
+    "stopId": "de-DELFI_de:05315:11201",
+    "lat": 50.94303,
+    "lon": 6.958729000000001,
+    "arrival": "2026-11-13T12:40:00Z",
+    "departure": "2026-11-13T12:42:00Z",
+    "scheduledArrival": "2026-11-13T11:11:00Z",
+    "scheduledDeparture": "2026-11-13T11:15:00Z",
+    "cancelled": false
+   }
+  },
+  {
+   "mode": "REGIONAL_RAIL",
+   "realTime": true,
+   "headsign": "Wuppertal Oberbarmen Bf",
+   "tripId": "20261113_12:43_de-DELFI_3478698544",
+   "displayName": "RB48 (17338)",
+   "routeShortName": "RB48",
+   "tripShortName": "017338",
+   "cancelled": false,
+   "tripCancelled": false,
+   "place": {
+    "name": "Köln Hbf",
+    "stopId": "de-DELFI_de:05315:11201",
+    "lat": 50.94303,
+    "lon": 6.958729000000001,
+    "arrival": "2026-11-13T12:41:00Z",
+    "departure": "2026-11-13T12:43:00Z",
+    "scheduledArrival": "2026-11-13T12:22:00Z",
+    "scheduledDeparture": "2026-11-13T12:25:00Z",
+    "cancelled": false
+   }
+  }
+ ]
+}

@@ -1,0 +1,315 @@
+{
+ "itineraries": [
+  {
+   "startTime": "2026-11-13T12:36:00Z",
+   "endTime": "2026-11-13T14:00:00Z",
+   "transfers": 1,
+   "legs": [
+    {
+     "mode": "HIGHSPEED_RAIL",
+     "realTime": true,
+     "headsign": "Interlaken West",
+     "tripId": "20261113_08:25_de-DELFI_3478812875",
+     "displayName": "ICE 107",
+     "startTime": "2026-11-13T12:36:00Z",
+     "endTime": "2026-11-13T13:28:00Z",
+     "scheduledStartTime": "2026-11-13T11:56:00Z",
+     "scheduledEndTime": "2026-11-13T12:51:00Z",
+     "cancelled": false,
+     "from": {
+      "name": "Köln Hbf",
+      "stopId": "de-DELFI_de:05315:11201:7:76",
+      "lat": 50.94332,
+      "lon": 6.958548,
+      "departure": "2026-11-13T12:36:00Z",
+      "scheduledDeparture": "2026-11-13T11:56:00Z",
+      "track": "6",
+      "scheduledTrack": "88",
+      "cancelled": false
+     },
+     "to": {
+      "name": "Frankfurt (Main) Flughafen Fernbahnhof",
+      "stopId": "de-DELFI_de:06412:11511",
+      "lat": 50.053165,
+      "lon": 8.570185,
+      "arrival": "2026-11-13T13:28:00Z",
+      "scheduledArrival": "2026-11-13T12:51:00Z",
+      "track": "Fern 5",
+      "cancelled": false
+     }
+    },
+    {
+     "mode": "WALK",
+     "realTime": false,
+     "startTime": "2026-11-13T13:28:00Z",
+     "endTime": "2026-11-13T13:38:00Z",
+     "scheduledStartTime": "2026-11-13T13:28:00Z",
+     "scheduledEndTime": "2026-11-13T13:38:00Z",
+     "from": {
+      "name": "Frankfurt (Main) Flughafen Fernbahnhof",
+      "stopId": "de-DELFI_de:06412:11511",
+      "lat": 50.053165,
+      "lon": 8.570185,
+      "arrival": "2026-11-13T13:28:00Z",
+      "departure": "2026-11-13T13:28:00Z",
+      "scheduledArrival": "2026-11-13T12:51:00Z",
+      "scheduledDeparture": "2026-11-13T13:28:00Z",
+      "track": "Fern 5",
+      "cancelled": false
+     },
+     "to": {
+      "name": "Frankfurt (Main) Flughafen Regionalbahnhof",
+      "stopId": "de-DELFI_de:06412:2930",
+      "lat": 50.051219999999994,
+      "lon": 8.571250999999998,
+      "arrival": "2026-11-13T13:38:00Z",
+      "scheduledArrival": "2026-11-13T13:38:00Z"
+     }
+    },
+    {
+     "mode": "SUBURBAN",
+     "realTime": true,
+     "headsign": "Hanau Hauptbahnhof",
+     "tripId": "20261113_14:09_de-DELFI_3478773307",
+     "displayName": "S9",
+     "startTime": "2026-11-13T13:45:00Z",
+     "endTime": "2026-11-13T13:58:00Z",
+     "scheduledStartTime": "2026-11-13T13:45:00Z",
+     "scheduledEndTime": "2026-11-13T13:58:00Z",
+     "cancelled": false,
+     "from": {
+      "name": "Frankfurt (Main) Flughafen Regionalbahnhof",
+      "stopId": "de-DELFI_de:06412:2930",
+      "lat": 50.051219999999994,
+      "lon": 8.571250999999998,
+      "departure": "2026-11-13T13:45:00Z",
+      "scheduledDeparture": "2026-11-13T13:45:00Z",
+      "cancelled": false
+     },
+     "to": {
+      "name": "Frankfurt (Main) Hauptbahnhof tief",
+      "stopId": "de-DELFI_de:06412:7010",
+      "lat": 50.107110000000006,
+      "lon": 8.662561,
+      "arrival": "2026-11-13T13:58:00Z",
+      "scheduledArrival": "2026-11-13T13:58:00Z",
+      "cancelled": false
+     }
+    },
+    {
+     "mode": "WALK",
+     "realTime": false,
+     "startTime": "2026-11-13T13:58:00Z",
+     "endTime": "2026-11-13T14:00:00Z",
+     "scheduledStartTime": "2026-11-13T13:58:00Z",
+     "scheduledEndTime": "2026-11-13T14:00:00Z",
+     "from": {
+      "name": "Frankfurt (Main) Hauptbahnhof tief",
+      "stopId": "de-DELFI_de:06412:7010",
+      "lat": 50.107110000000006,
+      "lon": 8.662561,
+      "arrival": "2026-11-13T13:58:00Z",
+      "departure": "2026-11-13T13:58:00Z",
+      "scheduledArrival": "2026-11-13T13:58:00Z",
+      "scheduledDeparture": "2026-11-13T13:58:00Z",
+      "cancelled": false
+     },
+     "to": {
+      "name": "END",
+      "lat": 50.1071,
+      "lon": 8.6638,
+      "arrival": "2026-11-13T14:00:00Z",
+      "scheduledArrival": "2026-11-13T14:00:00Z"
+     }
+    }
+   ]
+  },
+  {
+   "startTime": "2026-11-13T12:41:00Z",
+   "endTime": "2026-11-13T14:00:00Z",
+   "transfers": 2,
+   "legs": [
+    {
+     "mode": "SUBURBAN",
+     "realTime": true,
+     "headsign": "Bergisch Gladbach (S)",
+     "tripId": "20261113_12:04_de-DELFI_3478289541",
+     "displayName": "S11",
+     "startTime": "2026-11-13T12:41:00Z",
+     "endTime": "2026-11-13T12:43:00Z",
+     "scheduledStartTime": "2026-11-13T12:27:00Z",
+     "scheduledEndTime": "2026-11-13T12:29:00Z",
+     "cancelled": false,
+     "from": {
+      "name": "Köln Hbf",
+      "stopId": "de-DELFI_de:05315:11201",
+      "lat": 50.94303,
+      "lon": 6.958729000000001,
+      "departure": "2026-11-13T12:41:00Z",
+      "scheduledDeparture": "2026-11-13T12:27:00Z",
+      "cancelled": false
+     },
+     "to": {
+      "name": "Köln Messe/Deutz Bf",
+      "stopId": "de-DELFI_de:05315:11901:7:79",
+      "lat": 50.94111,
+      "lon": 6.9759839999999995,
+      "arrival": "2026-11-13T12:43:00Z",
+      "scheduledArrival": "2026-11-13T12:29:00Z",
+      "track": "91",
+      "scheduledTrack": "91",
+      "cancelled": false
+     }
+    },
+    {
+     "mode": "WALK",
+     "realTime": false,
+     "startTime": "2026-11-13T12:43:00Z",
+     "endTime": "2026-11-13T12:45:00Z",
+     "scheduledStartTime": "2026-11-13T12:43:00Z",
+     "scheduledEndTime": "2026-11-13T12:45:00Z",
+     "from": {
+      "name": "Köln Messe/Deutz Bf",
+      "stopId": "de-DELFI_de:05315:11901:7:79",
+      "lat": 50.94111,
+      "lon": 6.9759839999999995,
+      "arrival": "2026-11-13T12:43:00Z",
+      "departure": "2026-11-13T12:43:00Z",
+      "scheduledArrival": "2026-11-13T12:29:00Z",
+      "scheduledDeparture": "2026-11-13T12:43:00Z",
+      "track": "91",
+      "scheduledTrack": "91",
+      "cancelled": false
+     },
+     "to": {
+      "name": "Köln Messe/Deutz Bf",
+      "stopId": "de-DELFI_de:05315:11901:7:81",
+      "lat": 50.941562999999995,
+      "lon": 6.973828000000001,
+      "arrival": "2026-11-13T12:45:00Z",
+      "scheduledArrival": "2026-11-13T12:45:00Z",
+      "track": "93",
+      "scheduledTrack": "93"
+     }
+    },
+    {
+     "mode": "HIGHSPEED_RAIL",
+     "realTime": true,
+     "headsign": "München Hbf",
+     "tripId": "20261113_12:11_de-DELFI_3478814391",
+     "displayName": "ICE 919",
+     "startTime": "2026-11-13T12:46:00Z",
+     "endTime": "2026-11-13T13:34:00Z",
+     "scheduledStartTime": "2026-11-13T12:30:00Z",
+     "scheduledEndTime": "2026-11-13T13:19:00Z",
+     "cancelled": false,
+     "from": {
+      "name": "Köln Messe/Deutz Bf",
+      "stopId": "de-DELFI_de:05315:11901:7:81",
+      "lat": 50.941562999999995,
+      "lon": 6.973828000000001,
+      "departure": "2026-11-13T12:46:00Z",
+      "scheduledDeparture": "2026-11-13T12:30:00Z",
+      "track": "11",
+      "scheduledTrack": "93",
+      "cancelled": false
+     },
+     "to": {
+      "name": "Frankfurt (Main) Flughafen Fernbahnhof",
+      "stopId": "de-DELFI_de:06412:11511",
+      "lat": 50.053165,
+      "lon": 8.570185,
+      "arrival": "2026-11-13T13:34:00Z",
+      "scheduledArrival": "2026-11-13T13:19:00Z",
+      "track": "Fern 4",
+      "cancelled": false
+     }
+    },
+    {
+     "mode": "WALK",
+     "realTime": false,
+     "startTime": "2026-11-13T13:34:00Z",
+     "endTime": "2026-11-13T13:44:00Z",
+     "scheduledStartTime": "2026-11-13T13:34:00Z",
+     "scheduledEndTime": "2026-11-13T13:44:00Z",
+     "from": {
+      "name": "Frankfurt (Main) Flughafen Fernbahnhof",
+      "stopId": "de-DELFI_de:06412:11511",
+      "lat": 50.053165,
+      "lon": 8.570185,
+      "arrival": "2026-11-13T13:34:00Z",
+      "departure": "2026-11-13T13:34:00Z",
+      "scheduledArrival": "2026-11-13T13:19:00Z",
+      "scheduledDeparture": "2026-11-13T13:34:00Z",
+      "track": "Fern 4",
+      "cancelled": false
+     },
+     "to": {
+      "name": "Frankfurt (Main) Flughafen Regionalbahnhof",
+      "stopId": "de-DELFI_de:06412:2930",
+      "lat": 50.051219999999994,
+      "lon": 8.571250999999998,
+      "arrival": "2026-11-13T13:44:00Z",
+      "scheduledArrival": "2026-11-13T13:44:00Z"
+     }
+    },
+    {
+     "mode": "SUBURBAN",
+     "realTime": true,
+     "headsign": "Hanau Hauptbahnhof",
+     "tripId": "20261113_14:09_de-DELFI_3478773307",
+     "displayName": "S9",
+     "startTime": "2026-11-13T13:45:00Z",
+     "endTime": "2026-11-13T13:58:00Z",
+     "scheduledStartTime": "2026-11-13T13:45:00Z",
+     "scheduledEndTime": "2026-11-13T13:58:00Z",
+     "cancelled": false,
+     "from": {
+      "name": "Frankfurt (Main) Flughafen Regionalbahnhof",
+      "stopId": "de-DELFI_de:06412:2930",
+      "lat": 50.051219999999994,
+      "lon": 8.571250999999998,
+      "departure": "2026-11-13T13:45:00Z",
+      "scheduledDeparture": "2026-11-13T13:45:00Z",
+      "cancelled": false
+     },
+     "to": {
+      "name": "Frankfurt (Main) Hauptbahnhof tief",
+      "stopId": "de-DELFI_de:06412:7010",
+      "lat": 50.107110000000006,
+      "lon": 8.662561,
+      "arrival": "2026-11-13T13:58:00Z",
+      "scheduledArrival": "2026-11-13T13:58:00Z",
+      "cancelled": false
+     }
+    },
+    {
+     "mode": "WALK",
+     "realTime": false,
+     "startTime": "2026-11-13T13:58:00Z",
+     "endTime": "2026-11-13T14:00:00Z",
+     "scheduledStartTime": "2026-11-13T13:58:00Z",
+     "scheduledEndTime": "2026-11-13T14:00:00Z",
+     "from": {
+      "name": "Frankfurt (Main) Hauptbahnhof tief",
+      "stopId": "de-DELFI_de:06412:7010",
+      "lat": 50.107110000000006,
+      "lon": 8.662561,
+      "arrival": "2026-11-13T13:58:00Z",
+      "departure": "2026-11-13T13:58:00Z",
+      "scheduledArrival": "2026-11-13T13:58:00Z",
+      "scheduledDeparture": "2026-11-13T13:58:00Z",
+      "cancelled": false
+     },
+     "to": {
+      "name": "END",
+      "lat": 50.1071,
+      "lon": 8.6638,
+      "arrival": "2026-11-13T14:00:00Z",
+      "scheduledArrival": "2026-11-13T14:00:00Z"
+     }
+    }
+   ]
+  }
+ ]
+}

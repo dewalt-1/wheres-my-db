@@ -39,20 +39,20 @@ See [`examples/`](./examples/) for three full transcripts.
 ┌──────────────────────────────────────────────────────────┐
 │  MCP server: db-mcp (TypeScript)                         │
 │  Typed data access. No reasoning.                        │
-│  ┌─────────────────────┐    ┌─────────────────────┐      │
-│  │ marudor (primary)   │ →  │ db-rest (fallback)  │      │
-│  │ tRPC + devalue      │    │ plain REST          │      │
-│  └─────────────────────┘    └─────────────────────┘      │
 │  ┌─────────────────────────────────────────────────┐     │
-│  │ DWD weather warnings (independent source)       │     │
+│  │ Transitous: stations, departures, per-stop      │     │
+│  │ delays, journeys, trains in an area (realtime)  │     │
 │  └─────────────────────────────────────────────────┘     │
-│  + 5-min in-memory LRU cache                             │
+│  ┌─────────────────────────────────────────────────┐     │
+│  │ DWD: official weather warnings for a location   │     │
+│  └─────────────────────────────────────────────────┘     │
+│  + short in-memory cache                                 │
 └──────────────────────────────────────────────────────────┘
 ```
 
 Two artifacts. Clean split:
 
-- **The MCP server** knows nothing about reasoning. It's typed data access with transparent provider fallback.
+- **The MCP server** knows nothing about reasoning. It's typed access to live data.
 - **The skill** knows nothing about API endpoints. It's a reasoning playbook in markdown.
 
 Both are independently testable. Both ship in this repo.
@@ -61,11 +61,12 @@ Both are independently testable. Both ship in this repo.
 
 ## What's interesting under the hood
 
-- **The primary data source isn't a public REST API.** Marudor (the community DB tracker) runs internal tRPC with custom [devalue](https://github.com/Rich-Harris/devalue) encoding. The MCP includes a hand-rolled tRPC transport that speaks it, because no public alternative exposes per-stop connection-chain data ("will my Anschluss be held?") — which is the whole point.
-- **Transparent fallback to a stable REST API.** If marudor fails (it's an unofficial endpoint), the MCP transparently falls back to [db-rest](https://github.com/derhuerst/db-rest), and the skill tells the user the answer is degraded. Belt-and-suspenders engineering, not a hedge.
-- **External weather context.** A separate `WeatherClient` pulls live warnings from DWD (Deutscher Wetterdienst) — heatwave, storm, snow — so the agent can explain delays the DB feed hasn't acknowledged yet, and proactively warn about future trips through affected corridors.
-- **The skill is honest about uncertainty.** Delay predictions are rounded to 5-minute buckets ("about 10–15 minutes late") because precision would be theater. The skill explicitly enumerates which signals fired and what could change.
-- **6 atomic MCP tools, no reasoning baked in.** `resolve_station`, `find_train`, `get_train_status`, `plan_journey`, `get_disruptions`, `get_weather_risk`. The skill composes them.
+- **Live data for every kind of train.** Train data comes from [Transitous](https://transitous.org), an open, community-run service built on public timetable and realtime feeds. It covers long-distance, regional, S-Bahn, U-Bahn and tram, with the delay at every stop of a run.
+- **Late and stuck trains in an area.** One tool lists the trains currently running late around a point, with an estimated position, and flags those losing 10+ minutes between two stops as likely stuck.
+- **Weather context.** A separate client asks DWD (Deutscher Wetterdienst) for the official warnings covering a station's exact location, so the agent can explain delays and check conditions for a planned trip.
+- **The skill is honest about uncertainty.** Delay predictions are rounded to 5-minute buckets ("about 10–15 minutes late") because precision would be theater. It says which signals it used, what could change, and when it only has timetable data.
+- **7 atomic MCP tools, no reasoning baked in.** `resolve_station`, `get_departures`, `find_train`, `get_train_status`, `plan_journey`, `get_late_trains`, `get_weather_risk`. The skill composes them.
+- **A live smoke check.** Unit tests mock the network, so `npm run smoke -w db-mcp` calls every tool against the real services and fails loudly when an upstream API changes.
 
 ---
 
@@ -87,7 +88,7 @@ claude mcp add db-mcp -s user -- node "$PWD/packages/db-mcp/dist/index.js"
 ln -s "$PWD/packages/skill-db-delay" ~/.claude/skills/db-delay-predictor
 ```
 
-Open a `claude` session, run `/mcp` to confirm `db-mcp` is connected with 6 tools, then ask:
+Open a `claude` session, run `/mcp` to confirm `db-mcp` is connected with 7 tools, then ask:
 
 ```
 Is ICE 597 on time today?
@@ -120,7 +121,7 @@ command = "node"
 args = ["/absolute/path/to/wheres-my-db/packages/db-mcp/dist/index.js"]
 ```
 
-Restart `codex`. The 6 tools (`resolve_station`, `find_train`, `get_train_status`, `plan_journey`, `get_disruptions`, `get_weather_risk`) become callable from any session.
+Restart `codex`. The 7 tools (`resolve_station`, `get_departures`, `find_train`, `get_train_status`, `plan_journey`, `get_late_trains`, `get_weather_risk`) become callable from any session.
 
 Codex doesn't load `SKILL.md` automatically. To get the reasoning playbook, paste the contents of `packages/skill-db-delay/SKILL.md` into your project's `AGENTS.md` or the Codex system-prompt equivalent. (Verify the exact mechanism against current Codex docs — the config schema has shifted across versions.)
 
@@ -140,7 +141,7 @@ Codex doesn't load `SKILL.md` automatically. To get the reasoning playbook, past
 }
 ```
 
-Restart opencode. Same 6 tools become available.
+Restart opencode. Same 7 tools become available.
 
 For the reasoning playbook: copy the body of `packages/skill-db-delay/SKILL.md` into your project's `AGENTS.md` (opencode's instruction file) or use it as the system prompt.
 
@@ -184,9 +185,10 @@ packages/
 │   ├── src/
 │   │   ├── server.ts        wiring + cache integration
 │   │   ├── tools/           one file per MCP tool
-│   │   ├── clients/         marudor (tRPC) + db-rest + provider router
+│   │   ├── clients/         Transitous (trains) + DWD (weather)
 │   │   ├── cache.ts         LRU
 │   │   └── types.ts         normalized domain types
+│   ├── scripts/smoke.mjs    live check against the real services
 │   └── tests/               vitest + msw
 └── skill-db-delay/
     └── SKILL.md             the reasoning playbook
@@ -201,15 +203,20 @@ examples/                    saved demo transcripts
 npm test
 ```
 
-Tests cover cache, provider clients, fallback routing, tool wrappers, and server wiring. Network calls are mocked via [msw](https://mswjs.io); failure modes (timeout, 5xx, partial collapse) are part of the test surface, not afterthoughts.
+Tests cover the cache, both data clients, the tools, and server wiring. Network calls are mocked via [msw](https://mswjs.io), using trimmed real responses as fixtures; failure modes (timeout, 5xx, malformed bodies) are part of the test surface.
+
+To check the real services are still reachable and shaped as expected:
+
+```bash
+npm run smoke -w db-mcp
+```
 
 ---
 
 ## Credits
 
-- [marudor / bahn.expert](https://bahn.expert) — the data source that makes the connection-chain feature possible. Without it this project doesn't exist.
-- [db-rest](https://github.com/derhuerst/db-rest) by Jannis R — the stable REST fallback.
-- [DWD (Deutscher Wetterdienst)](https://www.dwd.de) — Germany's official weather service. Their public warnings JSON drives the weather-context signal.
+- [Transitous](https://transitous.org) — the open, community-run transit API (built on [MOTIS](https://github.com/motis-project/motis)) that provides all train data. Please use it considerately.
+- [DWD (Deutscher Wetterdienst)](https://www.dwd.de) — Germany's official weather service, source of the weather warnings.
 
 ## License
 

@@ -1,18 +1,21 @@
 {
   "name": "db-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server exposing Deutsche Bahn timetable, train status, and disruption data.",
   "type": "module",
   "bin": {
     "db-mcp": "./dist/index.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke": "npm run build && node scripts/smoke.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

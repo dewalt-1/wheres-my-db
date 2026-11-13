@@ -8,13 +8,10 @@ export interface ToolDef<TInput> {
   handler: (input: TInput) => Promise<SourcedResponse<unknown>>;
 }
 
-// Turns a SourcedResponse into the MCP CallToolResult shape, embedding
-// source/degraded as _meta so the skill can surface degradation to the user.
+// Turns a SourcedResponse into the MCP CallToolResult shape, embedding the
+// data source as _meta so the skill can say where an answer came from.
 export function asResult(res: SourcedResponse<unknown>): CallToolResult {
-  const body = {
-    data: res.data,
-    _meta: { source: res.source, degraded: res.degraded },
-  };
+  const body = { data: res.data, _meta: { source: res.source } };
   return {
     content: [{ type: "text", text: JSON.stringify(body, null, 2) }],
   };

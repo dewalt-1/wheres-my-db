@@ -7,26 +7,35 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { ZodError } from "zod";
 
-import { MarudorClient } from "./clients/marudor.js";
-import { DbRestClient } from "./clients/db-rest.js";
-import { ProviderRouter } from "./clients/provider.js";
+import { TransitousClient } from "./clients/transitous.js";
 import { WeatherClient } from "./clients/weather.js";
 import { createCache } from "./cache.js";
-import { ProviderError } from "./errors.js";
 import { makeResolveStationTool } from "./tools/resolve_station.js";
+import { makeGetDeparturesTool } from "./tools/get_departures.js";
 import { makeFindTrainTool } from "./tools/find_train.js";
 import { makeGetTrainStatusTool } from "./tools/get_train_status.js";
 import { makePlanJourneyTool } from "./tools/plan_journey.js";
-import { makeGetDisruptionsTool } from "./tools/get_disruptions.js";
+import { makeGetLateTrainsTool } from "./tools/get_late_trains.js";
 import { makeGetWeatherRiskTool } from "./tools/get_weather_risk.js";
 import { asError, asResult } from "./tools/runtime.js";
-import type { SourcedResponse, WeatherWarning } from "./types.js";
+import type { SourcedResponse } from "./types.js";
+
+/** The train-data methods the tools need. */
+export type TrainData = Pick<
+  TransitousClient,
+  | "searchStations"
+  | "getDepartures"
+  | "findTrain"
+  | "getTrainStatus"
+  | "planJourney"
+  | "getTrainsInArea"
+>;
+
+/** The weather methods the tools need. */
+export type WeatherData = Pick<WeatherClient, "getWarningsNear">;
 
 export interface CreateServerOptions {
-  providers?: {
-    router: ProviderRouter;
-    weather: Pick<WeatherClient, "getWarningsForStation">;
-  };
+  providers?: { trains: TrainData; weather: WeatherData };
 }
 
 export interface ServerHandle {
@@ -35,18 +44,23 @@ export interface ServerHandle {
   callTool: (name: string, args: unknown) => Promise<CallToolResult>;
 }
 
+// Live delays change by the minute, so cache briefly: long enough to absorb
+// repeated calls inside one conversation turn, short enough to stay current.
+const TRAIN_CACHE_TTL_MS = 60 * 1000;
+// Station names and weather warnings move slowly.
+const SLOW_CACHE_TTL_MS = 5 * 60 * 1000;
+
 export function createServer(opts: CreateServerOptions = {}): ServerHandle {
-  const providers = opts.providers ?? buildDefaultProviders();
-  const router = providers.router;
-  const weather = providers.weather;
+  const { trains, weather } = opts.providers ?? buildDefaultProviders();
 
   const tools = [
-    makeResolveStationTool(router),
-    makeFindTrainTool(router),
-    makeGetTrainStatusTool(router),
-    makePlanJourneyTool(router),
-    makeGetDisruptionsTool(router),
-    makeGetWeatherRiskTool(weather as WeatherClient),
+    makeResolveStationTool(trains),
+    makeGetDeparturesTool(trains),
+    makeFindTrainTool(trains),
+    makeGetTrainStatusTool(trains),
+    makePlanJourneyTool(trains),
+    makeGetLateTrainsTool(trains),
+    makeGetWeatherRiskTool(weather),
   ];
   const byName = new Map(tools.map((t) => [t.spec.name, t]));
 
@@ -68,7 +82,7 @@ export function createServer(opts: CreateServerOptions = {}): ServerHandle {
   };
 
   const server = new Server(
-    { name: "db-mcp", version: "0.1.0" },
+    { name: "db-mcp", version: "0.2.0" },
     { capabilities: { tools: {} } },
   );
   server.setRequestHandler(ListToolsRequestSchema, listTools);
@@ -79,73 +93,33 @@ export function createServer(opts: CreateServerOptions = {}): ServerHandle {
   return { server, listTools, callTool };
 }
 
-function buildDefaultProviders(): {
-  router: ProviderRouter;
-  weather: WeatherClient;
-} {
-  const marudor = new MarudorClient();
-  const dbRest = new DbRestClient();
-  const baseRouter = new ProviderRouter(marudor, dbRest);
-  const router = wrapWithCache(baseRouter);
+function buildDefaultProviders(): { trains: TrainData; weather: WeatherData } {
+  const client = new TransitousClient();
+  const weatherClient = new WeatherClient();
+  const live = createCache<object>({ max: 500, ttlMs: TRAIN_CACHE_TTL_MS });
+  const slow = createCache<object>({ max: 500, ttlMs: SLOW_CACHE_TTL_MS });
 
-  const baseWeather = new WeatherClient({
-    stationResolver: async (evaNumber: string) => {
-      // Reuse marudor station search to get lat/lon for an EVA number.
-      // Picks the first result whose evaNumber matches exactly.
-      const stations = await marudor.searchStations(evaNumber);
-      const match = stations.find((s) => s.evaNumber === evaNumber);
-      if (!match) {
-        throw new ProviderError(
-          `Could not resolve coordinates for station ${evaNumber}`,
-          "dwd",
-          "not_found",
-        );
-      }
-      const pos = match.position;
-      if (!pos) {
-        throw new ProviderError(
-          `Station ${evaNumber} has no coordinates`,
-          "dwd",
-          "not_found",
-        );
-      }
-      return { lat: pos.lat, lon: pos.lon, name: match.name };
-    },
-  });
-  const weather = wrapWeatherWithCache(baseWeather);
-
-  return { router, weather };
-}
-
-function wrapWeatherWithCache(client: WeatherClient): WeatherClient {
-  const cache = createCache<{
-    stationCoordinates: { lat: number; lon: number; name: string };
-    warnings: WeatherWarning[];
-  }>({ max: 200, ttlMs: 5 * 60 * 1000 });
-  const original = client.getWarningsForStation.bind(client);
-  client.getWarningsForStation = (eva: string, atTime?: string) => {
-    const key = `weather:${eva}:${atTime ?? "now"}`;
-    return cache.getOrCompute(key, () => original(eva, atTime));
-  };
-  return client;
-}
-
-function wrapWithCache(router: ProviderRouter): ProviderRouter {
-  // 5-minute TTL, 500 entries — well within memory for a personal MCP.
-  const cache = createCache<SourcedResponse<unknown>>({ max: 500, ttlMs: 5 * 60 * 1000 });
-  const wrap = <Args extends unknown[]>(
+  // Cache by method name + arguments. Failures are not cached.
+  const cached = <A extends unknown[], R extends object>(
+    cache: typeof live,
     label: string,
-    fn: (...args: Args) => Promise<SourcedResponse<unknown>>,
+    fn: (...args: A) => Promise<R>,
   ) => {
-    return async (...args: Args) => {
-      const key = `${label}:${JSON.stringify(args)}`;
-      return cache.getOrCompute(key, () => fn(...args)) as Promise<SourcedResponse<unknown>>;
-    };
+    return (...args: A): Promise<R> =>
+      cache.getOrCompute(`${label}:${JSON.stringify(args)}`, () => fn(...args)) as Promise<R>;
   };
-  const wrapped = Object.assign(Object.create(Object.getPrototypeOf(router)), router) as ProviderRouter;
-  wrapped.searchStations = wrap("searchStations", router.searchStations.bind(router)) as never;
-  wrapped.getTrainStatus = wrap("getTrainStatus", router.getTrainStatus.bind(router)) as never;
-  wrapped.searchJourneys = wrap("searchJourneys", router.searchJourneys.bind(router)) as never;
-  wrapped.getDisruptions = wrap("getDisruptions", router.getDisruptions.bind(router)) as never;
-  return wrapped;
+
+  return {
+    trains: {
+      searchStations: cached(slow, "searchStations", client.searchStations.bind(client)),
+      getDepartures: cached(live, "getDepartures", client.getDepartures.bind(client)),
+      findTrain: cached(live, "findTrain", client.findTrain.bind(client)),
+      getTrainStatus: cached(live, "getTrainStatus", client.getTrainStatus.bind(client)),
+      planJourney: cached(live, "planJourney", client.planJourney.bind(client)),
+      getTrainsInArea: cached(live, "getTrainsInArea", client.getTrainsInArea.bind(client)),
+    },
+    weather: {
+      getWarningsNear: cached(slow, "getWarningsNear", weatherClient.getWarningsNear.bind(weatherClient)),
+    },
+  };
 }
