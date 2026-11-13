@@ -1,33 +1,34 @@
 import { z } from "zod";
-import type { ProviderRouter } from "../clients/provider.js";
-import type { SourcedResponse, TrainIdentifier } from "../types.js";
-import type { ToolDef } from "./runtime.js";
+import type { TransitousClient } from "../clients/transitous.js";
+import type { Departure, SourcedResponse } from "../types.js";
 
 const Input = z.object({
   name: z.string().min(1),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  stationId: z.string().min(1),
+  time: z.string().optional(),
 });
 
-export function makeFindTrainTool(router: ProviderRouter): ToolDef<z.infer<typeof Input>> {
+export function makeFindTrainTool(client: Pick<TransitousClient, "findTrain">) {
   return {
     spec: {
       name: "find_train",
       description:
-        "Look up a train by its name/number (e.g. 'ICE 597'). Returns a TrainIdentifier whose journeyId is needed for get_train_status. Optional date narrows to a specific operating day.",
+        "Find a named train (e.g. 'ICE 107', 'RE1', 'S19') on the departure board of a station the train calls at. A station is required: there is no lookup by train name alone. Returns matching departures with their tripId; lines like 'S19' return several runs, pick by time and direction.",
       inputSchema: {
         type: "object" as const,
         properties: {
-          name: { type: "string" as const, description: "Train name, e.g. 'ICE 597'" },
-          date: { type: "string" as const, description: "Optional YYYY-MM-DD" },
+          name: { type: "string" as const, description: "Train or line name, e.g. 'ICE 107'" },
+          stationId: { type: "string" as const, description: "Id of a station the train departs from (resolve_station)" },
+          time: { type: "string" as const, description: "Optional ISO 8601 time to search from; defaults to now" },
         },
-        required: ["name"],
+        required: ["name", "stationId"],
         additionalProperties: false,
       },
     },
     schema: Input,
-    handler: async ({ name, date }: z.infer<typeof Input>): Promise<SourcedResponse<TrainIdentifier>> => {
-      const res = await router.getTrainStatus(name, date);
-      return { data: res.data.identifier, source: res.source, degraded: res.degraded };
-    },
+    handler: async ({ name, stationId, time }: z.infer<typeof Input>): Promise<SourcedResponse<Departure[]>> => ({
+      data: await client.findTrain(name, stationId, time),
+      source: "transitous",
+    }),
   };
 }

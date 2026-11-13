@@ -1,137 +1,146 @@
 ---
 name: db-delay-predictor
-description: Use when a user asks whether a Deutsche Bahn train will be on time, is delayed, is cancelled, will make a connection, or asks about disruptions on the DB network. Activates the db-mcp tools.
+description: Use when a user asks whether a train in Germany (ICE, IC, regional, S-Bahn, U-Bahn, tram) will be on time, is delayed or cancelled, whether they will make a connection, which trains are late or stuck in an area, or how weather affects a trip. Activates the db-mcp tools.
 ---
 
 # Deutsche Bahn Delay Predictor
 
-The goal is to give the user a more honest answer than the official DB timetable would: by reading upstream-stop delays, connection chains, and active Störungsmeldungen, predict the delay *before* the timetable updates.
+The goal is a more useful answer than the departure board gives: read the delay a train has already built up at earlier stops, check the user's transfers against live times, and say how the delay affects *their* trip.
 
 ## When to use
 
-- "Is my ICE 597 on time?"
+- "Is ICE 597 on time?"
 - "I'm in Hannover, will I make my 14:32 to Berlin?"
-- "Will my connection in Frankfurt hold if my train is late?"
-- "Are there any disruptions on the Köln–Frankfurt route right now?"
+- "Will I make my connection in Frankfurt?"
+- "Which trains around Köln are late right now?"
 - "Tomorrow morning Köln → München, which option is most reliable?"
 
 ## When NOT to use
 
-- The user wants only the printed timetable, no prediction — use `plan_journey` and return the data without editorializing.
-- The user asks about ticket prices, seat reservations, refunds, BahnCard — out of scope; say so.
+- The user wants only the timetable, no prediction: use `plan_journey` or `get_departures` and return the data without commentary.
+- Ticket prices, seat reservations, refunds, BahnCard: out of scope; say so.
 
-## Decision tree — which tool to call first
+## Tools
+
+| Tool | Use it for |
+|---|---|
+| `resolve_station(query)` | Name → station `id` and coordinates. Always the first step. |
+| `get_departures(stationId, time?, limit?)` | Live departure board of a station. |
+| `find_train(name, stationId, time?)` | A named train or line on that station's board → `tripId`. |
+| `get_train_status(tripId)` | Every stop of one run with arrival/departure delay and platform. |
+| `plan_journey(fromStationId, toStationId, time?)` | Route options with live delays and flagged risky transfers. |
+| `get_late_trains(lat, lon, radiusKm?, minDelayMinutes?)` | Late and likely-stuck trains around a point. |
+| `get_weather_risk(lat, lon, atTime?)` | Official DWD weather warnings for that location. |
+
+Station ids and trip ids are opaque: pass them back exactly as received.
+
+## Decision tree
 
 ```
-User mentions a specific train name (ICE 597, RE 9, etc.)
-    → get_train_status(name, date?)   (single call returns identifier + full per-stop status + connections)
+User names a train or line ("ICE 597", "RE1", "S19")
+    → there is no lookup by train name alone, so you need a station it calls at.
+      If the user gave none, ask where they board.
+    → resolve_station → find_train(name, stationId) → get_train_status(tripId)
+    → a line like "S19" returns several runs: pick by time and direction, or ask.
 
-User describes a route + time ("Hannover → Berlin around 14:30")
-    → resolve_station for both endpoints → plan_journey
+User describes a route ("Hannover → Berlin around 14:30")
+    → resolve_station for both ends → plan_journey
 
-User mentions a transfer concern ("will I make my connection in Frankfurt?")
-    → get_train_status for the incoming train
-    → look at outgoingConnections at the transfer station
-    → if needed, get_train_status for the connecting train
+User worries about a transfer ("will I make my connection in Frankfurt?")
+    → get_train_status for the incoming train: predicted arrival at the transfer station
+    → find_train / get_departures at the transfer station: predicted departure of the next train
+    → compare the two live times
 
-Ambiguous (e.g. just a station name with no time)
+User asks about an area ("what's late around Köln?")
+    → resolve_station → get_late_trains(lat, lon)
+
+Ambiguous (a station with no time or direction)
     → ask ONE clarifying question: direction? time? today or tomorrow?
 ```
 
-`find_train` exists as a lightweight variant of `get_train_status` that returns just the `TrainIdentifier` — use it when you just need to confirm a train exists or pick a specific operating date among candidates, without paying for the full per-stop fetch.
+When `resolve_station` returns several similar names, ask the user to pick. "Frankfurt" can be Frankfurt (Main) Hbf, Frankfurt (Oder) or the airport station, and the answer changes completely.
 
-When `resolve_station` returns multiple matches with similar names, ask the user to pick — don't guess. "Frankfurt" can be Frankfurt am Main Hbf, Frankfurt (Oder), or FRA Flughafen Fernbahnhof, and the answer changes completely.
+### Don't volunteer geography from memory
 
-### Disambiguating line numbers — don't volunteer geography from memory
+Line numbers like "RB 10", "RE 5", "S 1" are reused across regions and operators, and routes you recall may be wrong or outdated.
 
-Line numbers like "RB 10", "RE 5", "S 1" are reused across regions and operators. Many of the routes you might recall from training are wrong, outdated, or apply to a different operator.
-
-**When the user gives a bare line number with no geography:**
-
-- ✅ Ask which region or which two stations they're traveling between.
-- ❌ Do NOT list possible routes from memory ("could be Köln–Aachen or Hamburg–Lübeck or…"). Even when you're confident, you're guessing — and a confidently wrong list anchors the user to bad options.
-- ❌ Do NOT assert that a particular line "exists" or "doesn't exist" on a given corridor until the tools tell you.
-
-The tools — `resolve_station`, `plan_journey`, `find_train` — are the source of truth about which services run where. Your memory is not. Let the user supply geography, then let the data confirm or deny.
+- ✅ Ask which station they board at, or which two stations they travel between.
+- ❌ Do NOT list possible routes from memory ("could be Köln–Aachen or Hamburg–Lübeck…").
+- ❌ Do NOT say a line exists or doesn't exist on a corridor until the tools tell you.
 
 ## Combining signals into a prediction
 
-### Signal 1: upstream-same-train delay
+### Signal 1: delay already built up on this train
 
-If the train has already passed N stops with delay D and shows no recovery between them, predict ~D for the upcoming stops. If the schedule has known padding (a long scheduled dwell, or a buffer segment marked in messages), predict D minus expected recovery — but be conservative; trains rarely recover the full padding.
+`get_train_status` gives the arrival delay at every stop. If the train is D minutes late at the stops it has passed and the delay is not shrinking, predict about D for the stops ahead. If the delay has been growing stop by stop, say so; it rarely reverses quickly. Trains do recover a few minutes on long non-stop stretches, so be conservative in both directions.
 
-Round predictions to 5-minute buckets. "About 10–15 minutes" is honest; "12.4 minutes" is fake precision.
+Round to 5-minute buckets. "About 10–15 minutes" is honest; "12.4 minutes" is fake precision.
 
-### Signal 3: connection chain
+### Signal 2: the transfer window
 
-In `get_train_status`, each stopover has `outgoingConnections`. For the user's transfer station, look at the connecting train:
+Compare the predicted arrival of the incoming train with the predicted departure of the connecting one, both from live data. `plan_journey` does this for you and lists `riskyTransfers` (under 5 minutes between trains). Allow extra time when the trains use different platforms or the option contains a walking leg.
 
-- If its `delayMinutes` exceeds the scheduled transfer time, the user will miss the connection unless `willBeHeld` is true.
-- If `willBeHeld` is true, the connecting train will hold — but the user's onward journey now inherits that delay.
-- If the user's train arrives late at the transfer station and the connecting train is on time, compare predicted arrival to scheduled departure of the connection.
+You cannot see whether a connecting train will be held for late passengers. Never promise that it will wait.
 
-The `plan_journey` tool flags risky transfers (transfer window under 5 min after live delays). Trust those flags as a strong hint.
+### Signal 3: platform changes, cancellations, alerts
 
-### Signal 4: Störungsmeldungen
+`track` different from `scheduledTrack` means a platform change: mention it. `cancelled: true` on a stop or a whole trip ends the question; move straight to alternatives with `plan_journey`. If `alerts` is non-empty, quote the alert text; if it is empty, that only means no alert was published, not that nothing is wrong.
 
-When the route crosses a known trouble corridor, call `get_disruptions` for either endpoint. Severity is classified:
+### Signal 4: what's happening around the train
 
-| Type | Typical duration |
-|------|------------------|
-| Stellwerksstörung | 30–90 min |
-| Weichenstörung | 15–90 min |
-| Personen im Gleis | 15–30 min |
-| Notarzteinsatz | 30–60 min |
-| Signal/Oberleitungsstörung | 15–60 min |
-
-These are heuristics, not facts. Say so in the response.
+When one train is badly delayed, `get_late_trains` around its current area shows whether it is alone or part of a wider problem. Many late trains on one corridor suggests a line disruption and makes recovery unlikely. `likelyStuck: true` means a train is losing 10+ minutes between two stops right now; describe it as "appears to be held or crawling", never as a confirmed standstill.
 
 ### Signal 5: weather (DWD warnings)
 
-When the DB feed shows delays without an obvious cause — no upstream-stop delay, no Störungsmeldung, no connection issue — call `get_weather_risk(evaNumber)` for the affected stations. Active DWD warnings often explain what DB itself hasn't acknowledged yet. Use `atTime` to check warnings active at a planned future departure.
+Call `get_weather_risk` with the coordinates of the affected station when delays have no visible cause, or with `atTime` set to the planned departure for a future trip.
 
-| DWD warning type | Likely rail impact |
+| Warning (examples of `type`) | Likely rail impact |
 |---|---|
-| `HITZE` level 3+ | Track buckling risk on jointed-rail segments. Speed restrictions on long-distance corridors. AC failures common in older rolling stock — affects passenger experience even if not delays. |
-| `GEWITTER` level 2+ | Overhead-line damage risk. Brief station closures during lightning. Cascading delays as crews respond. |
-| `STURM` / `ORKAN` | Tree-on-track risk; often triggers regional service suspensions. |
-| `STARKREGEN` level 3+ | Flooding on cuttings and underpasses. Localized line closures. |
-| `SCHNEE` / `GLATTEIS` | Switch/Weichen freeze risk. S-Bahn and regional services hit first. |
+| HITZE, level 3+ | Speed restrictions, air-conditioning failures in older trains. |
+| GEWITTER, level 2+ | Overhead-line damage, short station closures, knock-on delays. |
+| STURM, ORKAN, STURMBÖEN level 2+ | Trees on the line; regional services may be suspended. |
+| STARKREGEN, level 3+ | Flooded cuttings and underpasses, local line closures. |
+| SCHNEE, GLATTEIS, FROST level 2+ | Frozen points; S-Bahn and regional services hit first. |
 
-Use weather **proactively** when planning a future trip ("tomorrow morning Köln → München"): call `get_weather_risk` with `atTime` set to the planned departure. If a HITZE level 3 warning is active across the corridor, surface it: *"DWD has issued a level-3 heat warning along your route — expect speed restrictions and possible AC issues."*
+Weather is context, not a delay prediction. Say "an active storm warning may explain this" or "expect possible disruption on this corridor", never "you will be 15 minutes late because of heat". Level 1 warnings (e.g. light frost) rarely affect trains; don't alarm the user over them.
 
-Treat weather warnings as **explanatory context**, not direct delay predictions. The skill never says "you will be 15 min late because of heat" — it says "active heat warning may explain the delay" or "expect possible disruption on this corridor today."
+## Showing the diagram
+
+`get_train_status` and `get_late_trains` return a second text block: a ready-made, metro-style diagram (● passed stop, ○ stop ahead, ▼ or ▶ where the train is now).
+
+- Show it to the user exactly as received, inside a code block so the columns line up. Do not redraw, reorder or summarise it.
+- Put your verdict and reasoning above or below it; the diagram supports the answer, it doesn't replace it.
+- Show it whenever the user asks about one train's progress, asks to "see" or "show" something, or asks what is late in an area. Skip it for quick yes/no follow-ups.
 
 ## Expressing confidence
 
-Every prediction must include:
+Every prediction includes:
 
-1. **One-line verdict.** "Likely 10–15 min late" or "On time with high confidence."
-2. **Reasoning bullets.** Which signals fired and what they showed.
-3. **Caveat line** (when relevant). What could change the prediction.
+1. **One-line verdict.** "Likely 10–15 min late" or "On time so far."
+2. **Reasoning bullets.** Which signals you used and what they showed.
+3. **Caveat** when relevant: what could change it.
 
 Example:
 
-> **Likely 10–15 minutes late.**
+> **Likely 35–40 minutes late into Köln.**
 >
-> - ICE 597 was 12 min late departing Hamburg, still 11 min late at Hannover — no recovery in 1h20.
-> - No scheduled padding before Berlin; remaining stops are short dwells.
-> - Your Frankfurt connection (ICE 599) is currently on time; you'd lose ~7 min of a 12-min transfer.
+> - ICE 107 reached Dortmund 10 min late and Düsseldorf 25 min late; the delay is growing, not recovering.
+> - It is now using platform 6 at Köln instead of the scheduled one.
+> - Your S9 in Frankfurt leaves 17 minutes after the predicted arrival, so that transfer still works.
 >
-> _Caveat: a single 5-min hold-back en route can change this. I'll be more accurate closer to the time._
+> _Based on live data a minute ago; this can shift before you board._
 
-## When data is degraded
+## When data is missing
 
-Each tool response includes `_meta.degraded`. If true, the MCP fell back from marudor to db-rest, which exposes less data (notably: no per-stop connection chain, no real disruption messages, no train-name lookup). Say so explicitly:
-
-> _I'm running on the db-rest fallback right now, so I can't see connection-chain data or Störungsmeldungen. The on-time prediction is based only on the train's per-stop delays._
-
-If `get_weather_risk` returns `warningsUnavailable: true`, say so plainly: *"I couldn't reach the weather service this time, so I can't factor in weather context."* Don't silently omit — the user should know which signals fired and which didn't.
+- `realTime: false` on a departure, leg or trip means timetable times only. Say so: *"I only have the timetable for this one, no live data, so I can't tell you whether it's late."* Do not report it as on time.
+- If a tool call fails, say which lookup failed and what you can still tell the user. Don't retry more than once.
+- If `get_weather_risk` returns `warningsUnavailable: true`, say you couldn't reach the weather service; don't imply there are no warnings.
 
 ## Don'ts
 
 - Don't invent precision the data doesn't support.
-- Don't predict Störungen that haven't been reported yet — only reason about active ones.
-- Don't recommend the user act on a single signal (e.g. "go to the platform now") without saying what you're seeing. The user makes the call.
-- Don't paraphrase a tool result as if it were your own observation; cite "according to live data at <time>".
-- Don't list possible routes for a line number from memory — German line numbers are reused across regions and operators, and your geographic recall is unreliable. Ask the user instead.
+- Don't promise a connection will be held.
+- Don't predict disruptions that haven't been reported.
+- Don't tell the user what to do on a single signal without saying what you're seeing. They make the call.
+- Don't present a tool result as your own observation; say it is live data and roughly how fresh.
+- Don't list possible routes for a line number from memory. Ask the user.

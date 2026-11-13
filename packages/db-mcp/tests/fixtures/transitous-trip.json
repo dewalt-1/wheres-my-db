@@ -1,0 +1,160 @@
+{
+ "legs": [
+  {
+   "mode": "HIGHSPEED_RAIL",
+   "realTime": true,
+   "headsign": "Interlaken West",
+   "tripId": "20261113_08:25_de-DELFI_3478812875",
+   "displayName": "ICE 107",
+   "routeShortName": "43",
+   "tripShortName": "ICE 107",
+   "cancelled": false,
+   "from": {
+    "name": "Hamburg-Altona",
+    "stopId": "de-DELFI_de:02000:8002553",
+    "lat": 53.552696,
+    "lon": 9.935175,
+    "departure": "2026-11-13T07:25:00Z",
+    "scheduledDeparture": "2026-11-13T07:25:00Z",
+    "track": "10",
+    "cancelled": false
+   },
+   "to": {
+    "name": "Interlaken West",
+    "stopId": "de-DELFI_ch:1:sloid:7493",
+    "lat": 46.68263,
+    "lon": 7.851453,
+    "arrival": "2026-11-13T18:08:00Z",
+    "scheduledArrival": "2026-11-13T17:53:00Z",
+    "track": "1",
+    "cancelled": false
+   },
+   "intermediateStops": [
+    {
+     "name": "Hamburg Dammtor",
+     "stopId": "de-DELFI_de:02000:8002548",
+     "lat": 53.560753000000005,
+     "lon": 9.989566000000002,
+     "arrival": "2026-11-13T07:32:00Z",
+     "departure": "2026-11-13T07:34:00Z",
+     "scheduledArrival": "2026-11-13T07:32:00Z",
+     "scheduledDeparture": "2026-11-13T07:34:00Z",
+     "track": "4",
+     "cancelled": false
+    },
+    {
+     "name": "Hamburg Hbf",
+     "stopId": "de-DELFI_de:02000:10950",
+     "lat": 53.552734,
+     "lon": 10.006909,
+     "arrival": "2026-11-13T07:38:00Z",
+     "departure": "2026-11-13T07:42:00Z",
+     "scheduledArrival": "2026-11-13T07:38:00Z",
+     "scheduledDeparture": "2026-11-13T07:42:00Z",
+     "track": "11",
+     "cancelled": false
+    },
+    {
+     "name": "Hamburg-Harburg",
+     "stopId": "de-DELFI_de:02000:8000147",
+     "lat": 53.45591,
+     "lon": 9.991700999999999,
+     "arrival": "2026-11-13T07:54:00Z",
+     "departure": "2026-11-13T07:56:00Z",
+     "scheduledArrival": "2026-11-13T07:55:00Z",
+     "scheduledDeparture": "2026-11-13T07:56:00Z",
+     "track": "4",
+     "cancelled": false
+    },
+    {
+     "name": "Bremen Hbf",
+     "stopId": "de-DELFI_de:04011:13927",
+     "lat": 53.083479999999994,
+     "lon": 8.813834000000002,
+     "arrival": "2026-11-13T08:49:00Z",
+     "departure": "2026-11-13T08:53:00Z",
+     "scheduledArrival": "2026-11-13T08:41:00Z",
+     "scheduledDeparture": "2026-11-13T08:44:00Z",
+     "track": "9",
+     "cancelled": false
+    },
+    {
+     "name": "Osnabrück Hbf",
+     "stopId": "de-DELFI_de:03404:71612",
+     "lat": 52.272850000000005,
+     "lon": 8.061781,
+     "arrival": "2026-11-13T09:37:00Z",
+     "departure": "2026-11-13T09:38:00Z",
+     "scheduledArrival": "2026-11-13T09:34:00Z",
+     "scheduledDeparture": "2026-11-13T09:37:00Z",
+     "track": "2",
+     "cancelled": false
+    },
+    {
+     "name": "Münster Hauptbahnhof",
+     "stopId": "de-DELFI_de:05515:41000:93:9",
+     "lat": 51.95659,
+     "lon": 7.6357159999999995,
+     "arrival": "2026-11-13T10:05:00Z",
+     "departure": "2026-11-13T10:06:00Z",
+     "scheduledArrival": "2026-11-13T10:00:00Z",
+     "scheduledDeparture": "2026-11-13T10:02:00Z",
+     "track": "9",
+     "scheduledTrack": "9",
+     "cancelled": false
+    },
+    {
+     "name": "Dortmund Hbf",
+     "stopId": "de-DELFI_de:05913:131:91:16",
+     "lat": 51.51787999999999,
+     "lon": 7.458721000000001,
+     "arrival": "2026-11-13T10:42:00Z",
+     "departure": "2026-11-13T10:45:00Z",
+     "scheduledArrival": "2026-11-13T10:32:00Z",
+     "scheduledDeparture": "2026-11-13T10:36:00Z",
+     "track": "16",
+     "scheduledTrack": "16",
+     "cancelled": false
+    },
+    {
+     "name": "Düsseldorf Hbf",
+     "stopId": "de-DELFI_de:05111:18235:93:15",
+     "lat": 51.219612000000005,
+     "lon": 6.794632,
+     "arrival": "2026-11-13T11:49:00Z",
+     "departure": "2026-11-13T12:04:00Z",
+     "scheduledArrival": "2026-11-13T11:24:00Z",
+     "scheduledDeparture": "2026-11-13T11:26:00Z",
+     "track": "18",
+     "scheduledTrack": "15",
+     "cancelled": false
+    },
+    {
+     "name": "Köln Hbf",
+     "stopId": "de-DELFI_de:05315:11201:7:76",
+     "lat": 50.94332,
+     "lon": 6.958548,
+     "arrival": "2026-11-13T12:29:00Z",
+     "departure": "2026-11-13T12:36:00Z",
+     "scheduledArrival": "2026-11-13T11:50:00Z",
+     "scheduledDeparture": "2026-11-13T11:56:00Z",
+     "track": "6",
+     "scheduledTrack": "88",
+     "cancelled": false
+    },
+    {
+     "name": "Frankfurt (Main) Flughafen Fernbahnhof",
+     "stopId": "de-DELFI_de:06412:11511",
+     "lat": 50.053165,
+     "lon": 8.570185,
+     "arrival": "2026-11-13T13:28:00Z",
+     "departure": "2026-11-13T13:31:00Z",
+     "scheduledArrival": "2026-11-13T12:51:00Z",
+     "scheduledDeparture": "2026-11-13T12:53:00Z",
+     "track": "Fern 5",
+     "cancelled": false
+    }
+   ]
+  }
+ ]
+}

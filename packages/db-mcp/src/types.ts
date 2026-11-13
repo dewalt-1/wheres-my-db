@@ -1,76 +1,81 @@
-// Shared domain types. These are the shapes our tools return, regardless of
-// whether the data came from marudor or db-rest. Each provider client maps
-// its own response shape into these types.
+// Shared domain types: the shapes our tools return. The Transitous client
+// maps the upstream (MOTIS) response shapes into these.
 
-export type DataSource = "marudor" | "db-rest" | "dwd";
+export type DataSource = "transitous" | "dwd";
 
 export interface SourcedResponse<T> {
   data: T;
   source: DataSource;
-  /** True when we fell back from marudor to db-rest. The skill surfaces this. */
-  degraded: boolean;
+  /** Optional plain-text diagram of the data, for the agent to show as-is. */
+  diagram?: string;
 }
 
 export interface Station {
-  evaNumber: string;
+  /** Opaque stop ID. Pass it back unchanged to the other tools. */
+  id: string;
   name: string;
-  /** Lower is better — caller can sort or pick top match. */
-  matchScore?: number;
-  position?: { lat: number; lon: number };
+  lat: number;
+  lon: number;
 }
 
-export interface TrainIdentifier {
-  /** Internal journey ID used by subsequent get_train_status calls. */
-  journeyId: string;
-  /** Human-facing train name, e.g. "ICE 597". */
-  name: string;
-  /** First station of the run. */
-  origin: string;
-  /** Final station of the run. */
-  destination: string;
-  /** Operating date in YYYY-MM-DD. */
-  date: string;
-}
-
-export interface OutgoingConnection {
+/** One departure from a station board. */
+export interface Departure {
+  /** Opaque trip ID, input to get_train_status. */
+  tripId: string;
+  /** Human-facing name, e.g. "ICE 107", "RE1 (26814)", "S19". */
   trainName: string;
-  destination: string;
+  /** Where the train is heading. */
+  headsign: string;
+  /** Upstream mode, e.g. HIGHSPEED_RAIL, REGIONAL_RAIL, SUBURBAN, TRAM. */
+  mode: string;
   scheduledDeparture: string; // ISO 8601
   predictedDeparture: string; // ISO 8601
-  /** Delay of this connection's *departure* from the transfer station, in minutes. */
   delayMinutes: number;
-  /** Marudor flag — true when DB has committed to holding this connection. */
-  willBeHeld?: boolean;
+  track?: string;
+  scheduledTrack?: string;
+  cancelled: boolean;
+  /** False when the times are timetable-only (no live data for this trip). */
+  realTime: boolean;
 }
 
 export interface Stopover {
   stationName: string;
-  evaNumber: string;
+  stationId: string;
+  lat: number;
+  lon: number;
   scheduledArrival?: string; // ISO 8601, absent for origin
   predictedArrival?: string;
   scheduledDeparture?: string; // absent for terminus
   predictedDeparture?: string;
   arrivalDelayMinutes?: number;
   departureDelayMinutes?: number;
-  platformScheduled?: string;
-  platformActual?: string;
+  track?: string;
+  scheduledTrack?: string;
   cancelled: boolean;
-  /** Trains departing from this station that connect from the current one. */
-  outgoingConnections: OutgoingConnection[];
-  /** Free-text messages attached to this stop. */
-  messages: string[];
+  /** Service alerts attached to this stop, as plain text. */
+  alerts: string[];
 }
 
 export interface TrainStatus {
-  identifier: TrainIdentifier;
-  stopovers: Stopover[];
-  /** Train-level messages, e.g. "Wagen 7 fällt aus", "Ersatzfahrt". */
-  messages: string[];
+  tripId: string;
+  /** Human-facing name, e.g. "ICE 107". */
+  name: string;
+  headsign: string;
+  mode: string;
+  /** False when the times are timetable-only (no live data for this trip). */
+  realTime: boolean;
   cancelled: boolean;
+  stopovers: Stopover[];
+  /** Trip-level service alerts, as plain text. */
+  alerts: string[];
 }
 
 export interface JourneyLeg {
+  /** Train name, or "WALK" for a footpath between platforms/stations. */
   trainName: string;
+  mode: string;
+  /** Present for transit legs; input to get_train_status. */
+  tripId?: string;
   from: Station;
   to: Station;
   scheduledDeparture: string;
@@ -79,23 +84,39 @@ export interface JourneyLeg {
   predictedArrival: string;
   departureDelayMinutes: number;
   arrivalDelayMinutes: number;
+  cancelled: boolean;
+  realTime: boolean;
 }
 
 export interface JourneyOption {
   legs: JourneyLeg[];
-  /** Transfers flagged when (transferTime - bufferThreshold) < incoming delay. */
+  /** Transfers flagged when the live gap between two trains is under the buffer. */
   riskyTransfers: Array<{ atStation: string; reason: string }>;
 }
 
-export interface Disruption {
-  id: string;
-  headline: string;
-  description: string;
-  /** Severity is approximate; "high" maps to Stellwerk/Personen-im-Gleis classes. */
-  severity: "low" | "medium" | "high";
-  affectedSegments: string[];
-  startTime?: string;
-  expectedEndTime?: string;
+/** A train currently moving between two stops, for area/map queries. */
+export interface TrainInArea {
+  tripId: string;
+  trainName: string;
+  mode: string;
+  fromStation: string;
+  toStation: string;
+  /** Predicted delay at the next stop, in minutes. */
+  delayMinutes: number;
+  /** Estimated current position, interpolated between the two stops. */
+  lat: number;
+  lon: number;
+  /** How far along the current segment the train is, from 0 to 1. */
+  progress: number;
+  /** Minutes of delay added between the last stop and the next one. */
+  delayGainedOnSegmentMinutes: number;
+  /**
+   * True when the train is losing 10+ minutes between two stops, i.e. it is
+   * probably held or crawling right now. An inference from live predictions,
+   * not a confirmed standstill.
+   */
+  likelyStuck: boolean;
+  realTime: boolean;
 }
 
 /** A weather warning from DWD (Deutscher Wetterdienst). */

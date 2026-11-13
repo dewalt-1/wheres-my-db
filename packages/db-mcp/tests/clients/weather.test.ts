@@ -3,405 +3,108 @@ import { http, HttpResponse } from "msw";
 import { mswServer } from "../setup.js";
 import { WeatherClient } from "../../src/clients/weather.js";
 import { ProviderError } from "../../src/errors.js";
-import dwdFixture from "../fixtures/dwd-warnings.json" with { type: "json" };
-import dwdEmptyFixture from "../fixtures/dwd-warnings-empty.json" with { type: "json" };
+import fixture from "../fixtures/dwd-warnings-point.json" with { type: "json" };
 
-const BASE_URL = "https://www.dwd.de";
-const WFS_BASE_URL = "https://maps.dwd.de";
+const URL_ = "https://maps.dwd.de/geoserver/dwd/ows";
+const MUNICH = { lat: 48.137, lon: 11.575 };
+// The fixture holds one FROST warning: 2026-11-13T19:00Z to 2026-11-14T08:00Z.
+const DURING = "2026-11-13T22:00:00Z";
 
-// DWD returns JSONP — wrap the fixture as the real endpoint would.
-function jsonpWrap(obj: unknown): string {
-  return `warnWetter.loadWarnings(${JSON.stringify(obj)});`;
+function feature(props: Record<string, unknown>) {
+  return { type: "Feature", properties: { ...fixture.features[0].properties, ...props } };
 }
 
-// Station resolver fake — returns Köln Hbf coordinates for any evaNumber.
-const koelnHbf = { lat: 50.9429, lon: 6.9582, name: "Köln Hbf" };
-function fakeResolver(_eva: string) {
-  return Promise.resolve(koelnHbf);
+function isDwdError(kind: string) {
+  return (err: unknown) => err instanceof ProviderError && err.source === "dwd" && err.kind === kind;
 }
 
-// WFS GeoJSON stub: polygon centroids for the three warncell IDs in the fixture.
-//
-// - 109184000  Bayern / München:          centroid ~(48.137, 11.576)  — ~477 km from Köln
-// - 101061000  Schleswig-Holstein / SH:   centroid ~(53.952,  9.533)  — ~352 km from Köln
-// - 105313000  NRW / Stadt Köln:          centroid ~(50.938,  6.960)  — ~0.7 km from Köln
-//
-// Each polygon is a tiny square around the centroid; actual shape doesn't
-// matter because we use centroid haversine, not point-in-polygon.
-function makeWfsStub() {
-  return {
-    type: "FeatureCollection",
-    features: [
-      {
-        type: "Feature",
-        properties: { WARNCELLID: 109184000, NAME: "München", BL: "BY" },
-        geometry: {
-          type: "Polygon",
-          coordinates: [
-            [
-              [11.576, 48.137],
-              [11.577, 48.137],
-              [11.577, 48.138],
-              [11.576, 48.138],
-              [11.576, 48.137],
-            ],
-          ],
-        },
-      },
-      {
-        type: "Feature",
-        properties: { WARNCELLID: 101061000, NAME: "Kreis Steinburg", BL: "SH" },
-        geometry: {
-          type: "Polygon",
-          coordinates: [
-            [
-              [9.533, 53.952],
-              [9.534, 53.952],
-              [9.534, 53.953],
-              [9.533, 53.953],
-              [9.533, 53.952],
-            ],
-          ],
-        },
-      },
-      {
-        type: "Feature",
-        properties: { WARNCELLID: 105313000, NAME: "Stadt Köln", BL: "NW" },
-        geometry: {
-          type: "Polygon",
-          coordinates: [
-            [
-              [6.960, 50.938],
-              [6.961, 50.938],
-              [6.961, 50.939],
-              [6.960, 50.939],
-              [6.960, 50.938],
-            ],
-          ],
-        },
-      },
-    ],
-  };
-}
-
-// Match only the WFS path; MSW recommends matching paths without query strings.
-const WFS_PATH = `${WFS_BASE_URL}/geoserver/dwd/ows`;
-
-describe("WeatherClient.getWarningsForStation", () => {
-  it("happy path: returns mapped warnings for a station", async () => {
+describe("WeatherClient.getWarningsNear", () => {
+  it("asks for the district containing the point, lon before lat, and maps the warning", async () => {
     mswServer.use(
-      http.get(
-        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
-        () =>
-          new HttpResponse(jsonpWrap(dwdFixture), {
-            status: 200,
-            headers: { "Content-Type": "application/javascript" },
-          }),
-      ),
-      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
-    );
-
-    const client = new WeatherClient({
-      baseUrl: BASE_URL,
-      wfsBaseUrl: WFS_BASE_URL,
-      stationResolver: fakeResolver,
-    });
-    // Use an explicit atTime in the middle of July 2026 so the time filter is
-    // deterministic regardless of when this test runs.
-    const result = await client.getWarningsForStation(
-      "8000207",
-      "2026-07-15T12:00:00.000Z",
-    );
-
-    expect(result.stationCoordinates).toEqual(koelnHbf);
-    expect(Array.isArray(result.warnings)).toBe(true);
-    // Only the NRW / Stadt Köln warning should survive coordinate filtering.
-    expect(result.warnings.length).toBeGreaterThan(0);
-    const w = result.warnings[0];
-    expect(typeof w.type).toBe("string");
-    expect([1, 2, 3, 4]).toContain(w.level);
-    expect(typeof w.headline).toBe("string");
-    // start/end are mapped from epoch ms to ISO 8601 strings.
-    expect(w.start).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    expect(w.end).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-  });
-});
-
-describe("WeatherClient filtering", () => {
-  it("returns empty array when DWD has no active warnings", async () => {
-    mswServer.use(
-      http.get(
-        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
-        () =>
-          new HttpResponse(jsonpWrap(dwdEmptyFixture), {
-            status: 200,
-            headers: { "Content-Type": "application/javascript" },
-          }),
-      ),
-      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
-    );
-
-    const client = new WeatherClient({
-      baseUrl: BASE_URL,
-      wfsBaseUrl: WFS_BASE_URL,
-      stationResolver: fakeResolver,
-    });
-    const result = await client.getWarningsForStation("8000207");
-    expect(result.warnings).toEqual([]);
-  });
-
-  it("atTime in the future drops warnings whose end is before it", async () => {
-    mswServer.use(
-      http.get(
-        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
-        () =>
-          new HttpResponse(jsonpWrap(dwdFixture), {
-            status: 200,
-            headers: { "Content-Type": "application/javascript" },
-          }),
-      ),
-      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
-    );
-
-    const client = new WeatherClient({
-      baseUrl: BASE_URL,
-      wfsBaseUrl: WFS_BASE_URL,
-      stationResolver: fakeResolver,
-    });
-    // Far future: every warning in the fixture should have ended.
-    const result = await client.getWarningsForStation(
-      "8000207",
-      "2099-12-31T00:00:00.000Z",
-    );
-    expect(result.warnings).toEqual([]);
-  });
-
-  it("coordinate radius filter drops warnings far from the station", async () => {
-    mswServer.use(
-      http.get(
-        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
-        () =>
-          new HttpResponse(jsonpWrap(dwdFixture), {
-            status: 200,
-            headers: { "Content-Type": "application/javascript" },
-          }),
-      ),
-      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
-    );
-
-    // Resolver returns a station on a different continent.
-    const farResolver = () =>
-      Promise.resolve({ lat: -33.8688, lon: 151.2093, name: "Sydney Hbf" });
-    const client = new WeatherClient({
-      baseUrl: BASE_URL,
-      wfsBaseUrl: WFS_BASE_URL,
-      stationResolver: farResolver,
-      radiusKm: 25,
-    });
-    // Use atTime within the fixture's active window so time filter passes;
-    // only the coordinate filter should drop the warnings.
-    const result = await client.getWarningsForStation(
-      "8000207",
-      "2026-07-15T12:00:00.000Z",
-    );
-    expect(result.warnings).toEqual([]);
-  });
-});
-
-describe("WeatherClient error paths", () => {
-  it("does not poison the cache if WFS fails with 5xx", async () => {
-    // First call: WFS returns 503 → no filtering, all warnings returned
-    mswServer.use(
-      http.get(
-        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
-        () =>
-          new HttpResponse(jsonpWrap(dwdFixture), {
-            status: 200,
-            headers: { "Content-Type": "application/javascript" },
-          }),
-      ),
-      http.get(WFS_PATH, () => new HttpResponse("boom", { status: 503 })),
-    );
-    const client = new WeatherClient({
-      baseUrl: BASE_URL,
-      wfsBaseUrl: WFS_BASE_URL,
-      stationResolver: fakeResolver,
-    });
-    const first = await client.getWarningsForStation(
-      "8000207",
-      "2026-07-15T12:00:00.000Z",
-    );
-    // Without coordinate filtering, all warnings in the fixture are kept
-    expect(first.warnings.length).toBe(3);
-
-    // Second call: WFS now succeeds, filtering should kick in
-    mswServer.use(
-      http.get(
-        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
-        () =>
-          new HttpResponse(jsonpWrap(dwdFixture), {
-            status: 200,
-            headers: { "Content-Type": "application/javascript" },
-          }),
-      ),
-      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
-    );
-    const second = await client.getWarningsForStation(
-      "8000207",
-      "2026-07-15T12:00:00.000Z",
-    );
-    // Now coordinate filtering works: only Köln-area warning survives
-    expect(second.warnings.length).toBe(1);
-  });
-
-  it("does not poison the cache if WFS times out", async () => {
-    // First call: WFS times out → no filtering, all warnings returned
-    mswServer.use(
-      http.get(
-        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
-        () =>
-          new HttpResponse(jsonpWrap(dwdFixture), {
-            status: 200,
-            headers: { "Content-Type": "application/javascript" },
-          }),
-      ),
-      http.get(WFS_PATH, async () => {
-        // Delay longer than the client's timeoutMs
-        await new Promise((r) => setTimeout(r, 200));
-        return HttpResponse.json(makeWfsStub());
+      http.get(URL_, ({ request }) => {
+        const q = new URL(request.url).searchParams;
+        expect(q.get("typeName")).toBe("dwd:Warnungen_Landkreise");
+        expect(q.get("version")).toBe("1.0.0");
+        expect(q.get("CQL_FILTER")).toBe("INTERSECTS(THE_GEOM, POINT(11.575 48.137))");
+        return HttpResponse.json(fixture);
       }),
     );
-    const client = new WeatherClient({
-      baseUrl: BASE_URL,
-      wfsBaseUrl: WFS_BASE_URL,
-      stationResolver: fakeResolver,
-      timeoutMs: 50,
-    });
-    const first = await client.getWarningsForStation(
-      "8000207",
-      "2026-07-15T12:00:00.000Z",
-    );
-    // Without coordinate filtering, all warnings in the fixture are kept
-    expect(first.warnings.length).toBe(3);
-
-    // Second call: WFS now succeeds, filtering should kick in
-    mswServer.use(
-      http.get(
-        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
-        () =>
-          new HttpResponse(jsonpWrap(dwdFixture), {
-            status: 200,
-            headers: { "Content-Type": "application/javascript" },
-          }),
-      ),
-      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
-    );
-    const second = await client.getWarningsForStation(
-      "8000207",
-      "2026-07-15T12:00:00.000Z",
-    );
-    // Now coordinate filtering works: only Köln-area warning survives
-    expect(second.warnings.length).toBe(1);
+    const { warnings } = await new WeatherClient().getWarningsNear(MUNICH, DURING);
+    expect(warnings).toEqual([
+      {
+        type: "FROST",
+        level: 1,
+        headline: "Amtliche WARNUNG vor FROST",
+        description: fixture.features[0].properties.DESCRIPTION,
+        start: "2026-11-13T19:00:00.000Z",
+        end: "2026-11-14T08:00:00.000Z",
+        areaName: fixture.features[0].properties.AREADESC,
+      },
+    ]);
   });
 
-  it("throws ProviderError(http) on HTTP 5xx", async () => {
+  it("maps DWD severity words to levels 1-4", async () => {
     mswServer.use(
-      http.get(
-        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
-        () => new HttpResponse("upstream boom", { status: 503 }),
+      http.get(URL_, () =>
+        HttpResponse.json({
+          features: [
+            feature({ EVENT: "A", SEVERITY: "Minor" }),
+            feature({ EVENT: "B", SEVERITY: "Moderate" }),
+            feature({ EVENT: "C", SEVERITY: "Severe" }),
+            feature({ EVENT: "D", SEVERITY: "Extreme" }),
+            feature({ EVENT: "E", SEVERITY: "Unknown" }),
+          ],
+        }),
       ),
-      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
     );
-    const client = new WeatherClient({
-      baseUrl: BASE_URL,
-      stationResolver: fakeResolver,
-    });
-    await expect(
-      client.getWarningsForStation("8000207"),
-    ).rejects.toSatisfy(
-      (err: unknown) =>
-        err instanceof ProviderError &&
-        err.source === "dwd" &&
-        err.kind === "http",
-    );
+    const { warnings } = await new WeatherClient().getWarningsNear(MUNICH, DURING);
+    expect(warnings.map((w) => [w.type, w.level])).toEqual([["A", 1], ["B", 2], ["C", 3], ["D", 4]]);
   });
 
-  it("throws ProviderError(timeout) when the request exceeds timeoutMs", async () => {
-    mswServer.use(
-      http.get(
-        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
-        async () => {
-          // Delay longer than the client's timeoutMs.
-          await new Promise((r) => setTimeout(r, 200));
-          return new HttpResponse(jsonpWrap(dwdFixture), { status: 200 });
-        },
-      ),
-      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
-    );
-    const client = new WeatherClient({
-      baseUrl: BASE_URL,
-      stationResolver: fakeResolver,
-      timeoutMs: 50,
-    });
-    await expect(
-      client.getWarningsForStation("8000207"),
-    ).rejects.toSatisfy(
-      (err: unknown) =>
-        err instanceof ProviderError &&
-        err.source === "dwd" &&
-        err.kind === "timeout",
-    );
+  it("with atTime, drops warnings not in force at that moment", async () => {
+    mswServer.use(http.get(URL_, () => HttpResponse.json(fixture)));
+    const client = new WeatherClient();
+    expect((await client.getWarningsNear(MUNICH, "2026-11-13T18:00:00Z")).warnings).toEqual([]);
+    expect((await client.getWarningsNear(MUNICH, "2026-11-14T09:00:00Z")).warnings).toEqual([]);
   });
 
-  it("throws ProviderError(parse) on non-JSON body", async () => {
+  it("without atTime, keeps upcoming warnings and drops expired ones", async () => {
+    const future = new Date(Date.now() + 6 * 3600_000).toISOString();
+    const later = new Date(Date.now() + 12 * 3600_000).toISOString();
+    const past = new Date(Date.now() - 6 * 3600_000).toISOString();
+    const earlier = new Date(Date.now() - 12 * 3600_000).toISOString();
     mswServer.use(
-      http.get(
-        `${BASE_URL}/DWD/warnungen/warnapp/json/warnings.json`,
-        () =>
-          new HttpResponse("warnWetter.loadWarnings(not-json-at-all);", {
-            status: 200,
-            headers: { "Content-Type": "application/javascript" },
-          }),
+      http.get(URL_, () =>
+        HttpResponse.json({
+          features: [
+            feature({ EVENT: "UPCOMING", ONSET: future, EXPIRES: later }),
+            feature({ EVENT: "EXPIRED", ONSET: earlier, EXPIRES: past }),
+          ],
+        }),
       ),
-      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
     );
-    const client = new WeatherClient({
-      baseUrl: BASE_URL,
-      stationResolver: fakeResolver,
-    });
-    await expect(
-      client.getWarningsForStation("8000207"),
-    ).rejects.toSatisfy(
-      (err: unknown) =>
-        err instanceof ProviderError &&
-        err.source === "dwd" &&
-        err.kind === "parse",
-    );
+    const { warnings } = await new WeatherClient().getWarningsNear(MUNICH);
+    expect(warnings.map((w) => w.type)).toEqual(["UPCOMING"]);
   });
 
-  it("throws ProviderError(not_found) when stationResolver throws", async () => {
-    // Note: WeatherClient does not currently translate resolver errors —
-    // it lets them propagate. This test confirms behavior. If translation
-    // is desired (e.g., wrap into ProviderError(not_found)), update the
-    // client in this step and adjust the assertion.
+  it("returns an empty list when no warning covers the point", async () => {
+    mswServer.use(http.get(URL_, () => HttpResponse.json({ type: "FeatureCollection", features: [] })));
+    expect((await new WeatherClient().getWarningsNear(MUNICH)).warnings).toEqual([]);
+  });
+
+  it("throws typed errors for HTTP failure, timeout and a malformed body", async () => {
+    mswServer.use(http.get(URL_, () => new HttpResponse("boom", { status: 503 })));
+    await expect(new WeatherClient().getWarningsNear(MUNICH)).rejects.toSatisfy(isDwdError("http"));
+
     mswServer.use(
-      http.get(WFS_PATH, () => HttpResponse.json(makeWfsStub())),
+      http.get(URL_, async () => {
+        await new Promise((r) => setTimeout(r, 200));
+        return HttpResponse.json(fixture);
+      }),
     );
-    const failingResolver = () =>
-      Promise.reject(
-        new ProviderError("station not found", "dwd", "not_found"),
-      );
-    const client = new WeatherClient({
-      baseUrl: BASE_URL,
-      stationResolver: failingResolver,
-    });
-    await expect(
-      client.getWarningsForStation("nonexistent"),
-    ).rejects.toSatisfy(
-      (err: unknown) =>
-        err instanceof ProviderError &&
-        err.source === "dwd" &&
-        err.kind === "not_found",
-    );
+    await expect(new WeatherClient({ timeoutMs: 30 }).getWarningsNear(MUNICH)).rejects.toSatisfy(isDwdError("timeout"));
+
+    mswServer.use(http.get(URL_, () => HttpResponse.json({ nope: true })));
+    await expect(new WeatherClient().getWarningsNear(MUNICH)).rejects.toSatisfy(isDwdError("parse"));
   });
 });

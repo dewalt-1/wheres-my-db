@@ -1,0 +1,30 @@
+[
+ {
+  "type": "STOP",
+  "name": "Köln Hbf",
+  "id": "be-sncb_8015458",
+  "lat": 50.943079999999995,
+  "lon": 6.95897
+ },
+ {
+  "type": "STOP",
+  "name": "Aachen Hauptbahnhof",
+  "id": "be-sncb_8015345",
+  "lat": 50.76776,
+  "lon": 6.0913900000000005
+ },
+ {
+  "type": "STOP",
+  "name": "Bonn Hauptbahnhof",
+  "id": "be-sncb_8015485",
+  "lat": 50.731970000000004,
+  "lon": 7.097204
+ },
+ {
+  "type": "STOP",
+  "name": "Stolberg, Hauptbahnhof (Bus)",
+  "id": "de-DELFI_de:05334:5766",
+  "lat": 50.794410000000006,
+  "lon": 6.217156999999999
+ }
+]

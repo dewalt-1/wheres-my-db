@@ -1,0 +1,255 @@
+[
+ {
+  "trips": [
+   {
+    "tripId": "20261113_10:20_de-DELFI_3478667113",
+    "displayName": "RE1 (26814)"
+   }
+  ],
+  "routeColor": "c00000",
+  "mode": "REGIONAL_RAIL",
+  "distance": 156674.375,
+  "from": {
+   "name": "Wiesdorf Leverkusen Mitte Bf",
+   "stopId": "de-DELFI_de:05316:21101:7:73",
+   "importance": 0.0004449926782399416,
+   "lat": 51.03201000000001,
+   "lon": 6.991408000000001,
+   "level": 0.0,
+   "tz": "Europe/Berlin",
+   "scheduledTrack": "79",
+   "track": "79",
+   "description": "Bahnsteig Gleis 3",
+   "vertexType": "TRANSIT",
+   "modes": [
+    "REGIONAL_RAIL",
+    "SUBURBAN",
+    "BUS",
+    "ODM"
+   ]
+  },
+  "to": {
+   "name": "Köln Mülheim Bf Mülheim",
+   "stopId": "de-DELFI_de:05315:19201:7:71",
+   "importance": 0.0012121006147935987,
+   "lat": 50.957713999999996,
+   "lon": 7.01277,
+   "level": 0.0,
+   "tz": "Europe/Berlin",
+   "scheduledTrack": "79",
+   "track": "79",
+   "description": "Bahnsteig Gleis 1",
+   "vertexType": "TRANSIT",
+   "modes": [
+    "REGIONAL_RAIL",
+    "SUBURBAN",
+    "TRAM",
+    "BUS"
+   ]
+  },
+  "departure": "2026-11-13T12:24:00Z",
+  "arrival": "2026-11-13T12:30:00Z",
+  "scheduledDeparture": "2026-11-13T10:55:00Z",
+  "scheduledArrival": "2026-11-13T11:01:00Z",
+  "realTime": true,
+  "polyline": "aenvHmoti@nASREFAbDi@j@Il@KDAPClCg@~Dw@`AUJAtDq@REJAVEdEq@pB[rCc@hGaAFA`@If@G`C_@rDm@|GgA|GiAjASbB[pCg@|AWHChAQvFaA`G_Ax@MrB]lDi@dAQPCVEbCa@jDi@dAOpGeAtF{@JCbDg@xGeAzEu@jEs@|GeAzJ_B`AO~F}@p@KbJwAZGnASvDm@v@KLCv@MxB_@zB]jBYjBYjBYpAQtAO`@E`AK`AIhC[f@ItAWfAYhA_@bAa@bAk@t@e@t@i@t@m@d@e@f@g@n@s@p@{@j@w@xAuBDExE}G^i@HM`AqAjDaFhAaB~@sAxAsBHMh@w@dBcCj@u@j@u@j@u@l@s@nByBlBqBrAsArAqA|@{@d@a@TSZYtAoApAkAfAcAnAgALMRQj@g@`@_@XWROfAy@~AkANKdBkAt@e@l@[r@]d@O`@MbBe@dAYb@KnA]`AWn@QHATEl@If@Ed@Ah@Bd@B\\DVDXFLDRFRF^Ph@ZTNVPVRVTj@l@TVZ\\TVVXPPRPd@^b@ZjAn@^Rf@VPHrAp@dAh@hAl@hAp@`@Xf@^n@j@n@l@v@z@t@t@VXb@`@dA~@r@j@l@d@pBtAl@^|CpBpAz@"
+ },
+ {
+  "trips": [
+   {
+    "tripId": "20261113_10:20_de-DELFI_3478667113",
+    "displayName": "RE1 (26814)"
+   }
+  ],
+  "routeColor": "c00000",
+  "mode": "REGIONAL_RAIL",
+  "distance": 156674.375,
+  "from": {
+   "name": "Köln Mülheim Bf Mülheim",
+   "stopId": "de-DELFI_de:05315:19201:7:71",
+   "importance": 0.0012121006147935987,
+   "lat": 50.957713999999996,
+   "lon": 7.01277,
+   "level": 0.0,
+   "tz": "Europe/Berlin",
+   "scheduledTrack": "79",
+   "track": "79",
+   "description": "Bahnsteig Gleis 1",
+   "vertexType": "TRANSIT",
+   "modes": [
+    "REGIONAL_RAIL",
+    "SUBURBAN",
+    "TRAM",
+    "BUS"
+   ]
+  },
+  "to": {
+   "name": "Köln Messe/Deutz Bf",
+   "stopId": "de-DELFI_de:05315:11901:7:78",
+   "importance": 0.003923220559954643,
+   "lat": 50.94106299999999,
+   "lon": 6.9759839999999995,
+   "level": 1.0,
+   "tz": "Europe/Berlin",
+   "scheduledTrack": "90",
+   "track": "90",
+   "description": "Bahnsteig Gleis 7",
+   "vertexType": "TRANSIT",
+   "modes": [
+    "HIGHSPEED_RAIL",
+    "LONG_DISTANCE",
+    "REGIONAL_RAIL",
+    "SUBURBAN",
+    "BUS"
+   ]
+  },
+  "departure": "2026-11-13T12:31:00Z",
+  "arrival": "2026-11-13T12:36:00Z",
+  "scheduledDeparture": "2026-11-13T11:02:00Z",
+  "scheduledArrival": "2026-11-13T11:07:00Z",
+  "realTime": true,
+  "polyline": "ut_vH{txi@h@^p@d@XRVPJJ^Xd@^r@r@hAlAb@b@d@h@V\\Zb@Vb@Xd@Tf@Vj@L`@JZJ`@L`@Jj@Lp@Jv@Hz@JpADl@JhBHvAD~@HbAL|AB^RpCF~@HdAHv@Hr@Hl@Jl@Nr@Nr@@Hp@|CLj@R~@j@fCR|@Pp@j@dBXv@Xp@`@v@d@x@RXRZf@l@\\^VXZXl@f@rB|Af@`@DDnBxAXRlA~@dBrAXRp@f@nA`Az@p@l@d@r@j@p@l@xAvAzB~BtBxBnArAr@z@p@|@v@pAb@r@\\p@~@lB^|@`@fA\\~@X`AXdAZhAPv@Ln@Nt@PbA@LTxANfAdAfI^vCD\\VvBHp@BZF|@Dj@@\\Bl@Bn@@d@?`@?FArAAv@Cn@EfAE`AGbAKpBQvCOvC"
+ },
+ {
+  "trips": [
+   {
+    "tripId": "20261113_13:03_de-DELFI_3478680466",
+    "displayName": "S28"
+   }
+  ],
+  "routeColor": "4a0b4d",
+  "mode": "SUBURBAN",
+  "distance": 39100.0859375,
+  "from": {
+   "name": "ME-Neanderthal S",
+   "stopId": "de-DELFI_de:05158:19191",
+   "importance": 0.00021344231208786368,
+   "lat": 51.22782,
+   "lon": 6.953250000000001,
+   "level": 0.0,
+   "tz": "Europe/Berlin",
+   "vertexType": "TRANSIT",
+   "modes": [
+    "SUBURBAN",
+    "BUS"
+   ]
+  },
+  "to": {
+   "name": "Erkrath Nord Bf",
+   "stopId": "de-DELFI_de:05158:19054",
+   "importance": 0.00021041596482973546,
+   "lat": 51.22928,
+   "lon": 6.910640000000001,
+   "level": 0.0,
+   "tz": "Europe/Berlin",
+   "vertexType": "TRANSIT",
+   "modes": [
+    "SUBURBAN",
+    "BUS"
+   ]
+  },
+  "departure": "2026-11-13T12:30:00Z",
+  "arrival": "2026-11-13T12:33:00Z",
+  "scheduledDeparture": "2026-11-13T12:30:00Z",
+  "scheduledArrival": "2026-11-13T12:33:00Z",
+  "realTime": false,
+  "polyline": "_mtwHy`mi@?D@\\?X@bA@r@?fBAn@?p@ChAGnBC~@GhAGv@MfAIp@O|@S~@Qv@kBjIUfAQbAQdAK|@Gx@I`AGtACjAAjA?pABpA@z@HnAHpALlANdAX`BR~@Rx@`AvDv@vCZzAZbBNhALlALtAFfABnAB`A?dAAnAEzAMvBM`BYlBUvAUdAU~@{@jDo@jCUdASpAQlAKbAMzAE`AEvAAn@?p@?x@@nBFzENfPLvOH`J@bA?xAAjAChAI`DIvEOpHAVGpC?H"
+ },
+ {
+  "trips": [
+   {
+    "tripId": "20261113_12:09_de-DELFI_3478307934",
+    "displayName": "RE9 (10916)"
+   }
+  ],
+  "routeColor": "521949",
+  "mode": "REGIONAL_RAIL",
+  "distance": 136556.640625,
+  "from": {
+   "name": "Köln Porz Bf Porz",
+   "stopId": "de-DELFI_de:05315:17301:7:71",
+   "importance": 0.0004482647927943617,
+   "lat": 50.883053,
+   "lon": 7.064693,
+   "level": 0.0,
+   "tz": "Europe/Berlin",
+   "scheduledTrack": "74",
+   "track": "74",
+   "description": "Bahnsteig Gleis 1",
+   "vertexType": "TRANSIT",
+   "modes": [
+    "REGIONAL_RAIL",
+    "SUBURBAN",
+    "BUS"
+   ]
+  },
+  "to": {
+   "name": "Köln Messe/Deutz Bf",
+   "stopId": "de-DELFI_de:05315:11901:7:75",
+   "importance": 0.003923220559954643,
+   "lat": 50.94087,
+   "lon": 6.975894,
+   "level": 1.0,
+   "tz": "Europe/Berlin",
+   "scheduledTrack": "88",
+   "track": "88",
+   "description": "Bahnsteig Gleis 4",
+   "vertexType": "TRANSIT",
+   "modes": [
+    "HIGHSPEED_RAIL",
+    "LONG_DISTANCE",
+    "REGIONAL_RAIL",
+    "SUBURBAN",
+    "BUS"
+   ]
+  },
+  "departure": "2026-11-13T12:23:00Z",
+  "arrival": "2026-11-13T12:33:00Z",
+  "scheduledDeparture": "2026-11-13T12:25:00Z",
+  "scheduledArrival": "2026-11-13T12:33:00Z",
+  "realTime": true,
+  "polyline": "cbquHmybj@KFoAp@oAt@a@Tk@\\s@^{CzAuAp@wE~B{DlBwIjE_@P_Ad@{Av@cBv@wAt@o@ZgFfCYNwGdDuDhBuAn@cEtBwFnCmB~@oBbAcBz@c@Ti@Xi@X{BnAkAr@m@^yBtA}B~AwB|Aa@Zu@l@]XaBvAyArAaB~AwAvAiBnBgAlAsAxAmAxAg@l@]b@_AhA}@jAwAlBwApBqAnBoAnBcBnC{@vAkAtB}ArC_AdBmA|B_AfB}AtCsAbCaDdG_AdBsD`H}@`B}BhEsDbHQ\\k@bAs@tAcB|Cg@|@eApBeDfGgArB_@p@aB|C{AvCCDaAjBaApB]r@g@~@}AzCKVWd@c@~@i@fAq@pA_CvEqAjCiA|BMTmAjCiA~BuAvCy@bBw@`BUf@Yl@CDEHs@bBc@bAaAfC[z@Yz@Qb@Of@wAjEwArEIZK\\yAzE_A|CeBvFaBpFgCjIuB`H]dAWr@Wt@]`Aa@fAs@hBk@xAo@dBYv@eA|CGR{@nCoBpGQj@Of@{@lCyB~GcCpHk@jBOb@Sn@e@zAa@tAe@zACF_A~Cy@lC_@lASt@Oj@Mf@Mp@Or@Kl@Kr@Kt@Ir@Ej@C^E`@GbAK~AIrASlDMzBM`BGn@?FGp@SjCMjBOtBM~BOpCAFCh@K|AG~@C\\E`@C^Eb@K|AE\\En@E`@?FKrAGz@M|B"
+ },
+ {
+  "trips": [
+   {
+    "tripId": "20261113_13:00_de-DELFI_3462691143",
+    "displayName": "285"
+   }
+  ],
+  "mode": "BUS",
+  "distance": 10870.9306640625,
+  "from": {
+   "name": "Altenkirchen (Westerw) Fontanestraße",
+   "stopId": "de-DELFI_de:07132:090627:01:01",
+   "importance": 2.0533336737571517e-06,
+   "lat": 50.70254500000001,
+   "lon": 7.637692,
+   "level": 0.0,
+   "tz": "Europe/Berlin",
+   "vertexType": "TRANSIT",
+   "modes": [
+    "BUS"
+   ]
+  },
+  "to": {
+   "name": "Kettenhausen Hauptstraße",
+   "stopId": "de-DELFI_de:07132:090099:01:01",
+   "importance": 1.3833900993631687e-06,
+   "lat": 50.70873000000001,
+   "lon": 7.627531999999999,
+   "level": 0.0,
+   "tz": "Europe/Berlin",
+   "vertexType": "TRANSIT",
+   "modes": [
+    "BUS"
+   ]
+  },
+  "departure": "2026-11-13T12:28:00Z",
+  "arrival": "2026-11-13T12:31:00Z",
+  "scheduledDeparture": "2026-11-13T12:28:00Z",
+  "scheduledArrival": "2026-11-13T12:31:00Z",
+  "realTime": true,
+  "polyline": "{ymtHqvrm@ADCXEhBAf@|D`@l@FCVETGZQ`@WZoExDsDlD_Ar@oDfB]PSNOLKLMPKRKVITGVGZSlAGXGXIVsAjDOVKTMPOPyAzAONcCdCINGLGJGRCJAFKt@CNELCHAFIHEDUNGFGFGHMVEHIHOLYP"
+ }
+]
