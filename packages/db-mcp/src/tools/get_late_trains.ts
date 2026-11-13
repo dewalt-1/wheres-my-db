@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { TransitousClient } from "../clients/transitous.js";
+import { renderLateTrains } from "../render.js";
 import type { SourcedResponse, TrainInArea } from "../types.js";
 
 const KM_PER_DEGREE_LAT = 111;
@@ -21,7 +22,7 @@ export function makeGetLateTrainsTool(client: Pick<TransitousClient, "getTrainsI
     spec: {
       name: "get_late_trains",
       description:
-        "List trains currently running late around a point (station coordinates from resolve_station), worst first. Each has an estimated position, predicted delay at its next stop, and likelyStuck=true when it is losing 10+ minutes between two stops (an inference, not a confirmed standstill). Default radius 40 km, default minimum delay 5 min.",
+        "List trains currently running late around a point (station coordinates from resolve_station), worst first. Each has an estimated position, predicted delay at its next stop, and likelyStuck=true when it is losing 10+ minutes between two stops (an inference, not a confirmed standstill). Also returns a text diagram to show the user as-is. Default radius 40 km, default minimum delay 5 min.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -49,7 +50,11 @@ export function makeGetLateTrainsTool(client: Pick<TransitousClient, "getTrainsI
       const lateTrains = trains
         .filter((t) => t.delayMinutes >= minDelay)
         .sort((a, b) => b.delayMinutes - a.delayMinutes);
-      return { data: { trainsChecked: trains.length, lateTrains }, source: "transitous" };
+      return {
+        data: { trainsChecked: trains.length, lateTrains },
+        source: "transitous",
+        diagram: renderLateTrains(lateTrains, { trainsChecked: trains.length }),
+      };
     },
   };
 }

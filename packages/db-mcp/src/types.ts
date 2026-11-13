@@ -6,6 +6,8 @@ export type DataSource = "transitous" | "dwd";
 export interface SourcedResponse<T> {
   data: T;
   source: DataSource;
+  /** Optional plain-text diagram of the data, for the agent to show as-is. */
+  diagram?: string;
 }
 
 export interface Station {
@@ -104,6 +106,8 @@ export interface TrainInArea {
   /** Estimated current position, interpolated between the two stops. */
   lat: number;
   lon: number;
+  /** How far along the current segment the train is, from 0 to 1. */
+  progress: number;
   /** Minutes of delay added between the last stop and the next one. */
   delayGainedOnSegmentMinutes: number;
   /**

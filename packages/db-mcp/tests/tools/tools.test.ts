@@ -30,10 +30,12 @@ describe("pass-through tools", () => {
   });
 
   it("get_train_status forwards the trip id", async () => {
-    const getTrainStatus = vi.fn().mockResolvedValue({ tripId: "t" });
+    const status = { tripId: "t", name: "ICE 1", headsign: "Berlin", mode: "HIGHSPEED_RAIL", realTime: true, cancelled: false, stopovers: [], alerts: [] };
+    const getTrainStatus = vi.fn().mockResolvedValue(status);
     const res = await makeGetTrainStatusTool({ getTrainStatus }).handler({ tripId: "t" });
     expect(getTrainStatus).toHaveBeenCalledWith("t");
-    expect(res.data).toEqual({ tripId: "t" });
+    expect(res.data).toEqual(status);
+    expect(res.diagram).toContain("ICE 1 → Berlin");
   });
 
   it("each tool rejects empty required input", () => {
@@ -112,6 +114,7 @@ function train(name: string, delayMinutes: number): TrainInArea {
     delayMinutes,
     lat: 51,
     lon: 7,
+    progress: 0.5,
     delayGainedOnSegmentMinutes: 0,
     likelyStuck: false,
     realTime: true,
@@ -126,6 +129,7 @@ describe("get_late_trains tool", () => {
     const res = await makeGetLateTrainsTool({ getTrainsInArea }).handler({ lat: 50.94, lon: 6.96 });
     expect(res.data.trainsChecked).toBe(4);
     expect(res.data.lateTrains.map((t) => t.trainName)).toEqual(["very", "a-bit"]);
+    expect(res.diagram).toContain("2 of 4 trains late");
   });
 
   it("turns centre + radius into a bounding box around the point", async () => {

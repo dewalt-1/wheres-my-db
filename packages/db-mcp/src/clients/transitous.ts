@@ -21,7 +21,8 @@ const DEFAULT_BASE_URL = "https://api.transitous.org";
 const DEFAULT_TIMEOUT_MS = 15000;
 // Transitous asks automated clients to identify themselves. Override with
 // the DB_MCP_USER_AGENT environment variable or the userAgent option.
-const DEFAULT_USER_AGENT = "db-mcp/0.2";
+const DEFAULT_USER_AGENT =
+  "wheres-my-db/0.2 (+https://github.com/dewalt-1/wheres-my-db)";
 
 /** Rail modes, as named by the upstream API. Buses, ferries etc. are excluded. */
 export const RAIL_MODES = [
@@ -417,6 +418,7 @@ export class TransitousClient {
         delayMinutes: delay,
         lat: fromLat + (toLat - fromLat) * progress,
         lon: fromLon + (toLon - fromLon) * progress,
+        progress,
         delayGainedOnSegmentMinutes: gained,
         likelyStuck: gained >= STUCK_MIN_GAIN_MINUTES,
         realTime: seg.realTime === true,

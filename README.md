@@ -19,7 +19,22 @@ Knowing a train is "5 min late" isn't useful. Knowing that the 12-minute delay t
 
 ![demo](docs/demo.png)
 
-See [`examples/`](./examples/) for three full transcripts.
+It also draws the picture in plain text, so it shows up in any chat window or terminal:
+
+```
+49 of 434 trains late, 4 likely stuck
+  +53 min  RE4 (26422)    Neuss Hauptbahnhof ●━━━━▶━━━━○ MG Hbf /Europaplatz
+  +40 min  IC 2203        Düsseldorf Hbf ●━━━━▶━━━━○ Köln Hbf  ⚠ likely stuck
+  +30 min  ICE 628        Köln Messe/Deutz Bf ●━━▶━━━━━━○ Düsseldorf Hbf  ⚠ likely stuck
+
+RE4 (26422) → Aachen, Hbf  (live)
+ ●  Wuppertal Hbf                  14:57  on time
+ ●  Düsseldorf Hbf                 15:21  +55 min
+ ●  Neuss Hauptbahnhof             15:36  +55 min
+ ▼  train is around here
+ ○  MG Hbf /Europaplatz            15:50  +53 min
+ ○  Aachen, Hbf                    16:37  +53 min
+```
 
 ---
 
@@ -66,6 +81,7 @@ Both are independently testable. Both ship in this repo.
 - **Weather context.** A separate client asks DWD (Deutscher Wetterdienst) for the official warnings covering a station's exact location, so the agent can explain delays and check conditions for a planned trip.
 - **The skill is honest about uncertainty.** Delay predictions are rounded to 5-minute buckets ("about 10–15 minutes late") because precision would be theater. It says which signals it used, what could change, and when it only has timetable data.
 - **7 atomic MCP tools, no reasoning baked in.** `resolve_station`, `get_departures`, `find_train`, `get_train_status`, `plan_journey`, `get_late_trains`, `get_weather_risk`. The skill composes them.
+- **Diagrams as plain text.** A train's route and the late trains in an area come back as a metro-style text diagram, because text is the one format every agent and chat app can display.
 - **A live smoke check.** Unit tests mock the network, so `npm run smoke -w db-mcp` calls every tool against the real services and fails loudly when an upstream API changes.
 
 ---
@@ -186,13 +202,13 @@ packages/
 │   │   ├── server.ts        wiring + cache integration
 │   │   ├── tools/           one file per MCP tool
 │   │   ├── clients/         Transitous (trains) + DWD (weather)
+│   │   ├── render.ts        plain-text route and late-train diagrams
 │   │   ├── cache.ts         LRU
 │   │   └── types.ts         normalized domain types
 │   ├── scripts/smoke.mjs    live check against the real services
 │   └── tests/               vitest + msw
 └── skill-db-delay/
     └── SKILL.md             the reasoning playbook
-examples/                    saved demo transcripts
 ```
 
 ---
