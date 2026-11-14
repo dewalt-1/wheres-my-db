@@ -39,6 +39,37 @@ describe("pass-through tools", () => {
     expect(res.mapUrl).toBe("https://dewalt-1.github.io/wheres-my-db/?trip=t");
   });
 
+  it("get_train_status marks the stop nearest to where the user boards", async () => {
+    const stop = (name: string, lat: number, lon: number) => ({ stationName: name, stationId: name, lat, lon, cancelled: false, alerts: [] });
+    const status = {
+      tripId: "t", name: "ICE 107", headsign: "Basel SBB", mode: "HIGHSPEED_RAIL", realTime: true, cancelled: false, alerts: [],
+      stopovers: [stop("Düsseldorf Hbf", 51.22, 6.794), stop("Köln Hbf", 50.943, 6.9587), stop("Frankfurt (Main) Flughafen", 50.053, 8.57)],
+    };
+    const tool = makeGetTrainStatusTool({ getTrainStatus: vi.fn().mockResolvedValue(status) });
+    // Station coordinates from a different feed, a few hundred metres off.
+    const res = await tool.handler({ tripId: "t", boardLat: 50.9431, boardLon: 6.959 });
+    expect(res.mapUrl).toBe("https://dewalt-1.github.io/wheres-my-db/?trip=t&stop=1");
+    const boardingLine = res.diagram?.split("\n").find((l) => l.includes("you board here"));
+    expect(boardingLine).toContain("Köln Hbf");
+  });
+
+  it("get_train_status marks no stop when the given point is not on the route", async () => {
+    const status = {
+      tripId: "t", name: "ICE 107", headsign: "Basel SBB", mode: "HIGHSPEED_RAIL", realTime: true, cancelled: false, alerts: [],
+      stopovers: [{ stationName: "Köln Hbf", stationId: "k", lat: 50.943, lon: 6.9587, cancelled: false, alerts: [] }],
+    };
+    const tool = makeGetTrainStatusTool({ getTrainStatus: vi.fn().mockResolvedValue(status) });
+    const res = await tool.handler({ tripId: "t", boardLat: 52.52, boardLon: 13.37 });
+    expect(res.mapUrl).toBe("https://dewalt-1.github.io/wheres-my-db/?trip=t");
+    expect(res.diagram).not.toContain("you board here");
+  });
+
+  it("get_train_status needs both boarding coordinates or neither", () => {
+    const schema = makeGetTrainStatusTool({} as never).schema;
+    expect(() => schema.parse({ tripId: "t", boardLat: 50.9 })).toThrow();
+    expect(schema.parse({ tripId: "t" })).toEqual({ tripId: "t" });
+  });
+
   it("each tool rejects empty required input", () => {
     expect(() => makeResolveStationTool({} as never).schema.parse({ query: "" })).toThrow();
     expect(() => makeGetDeparturesTool({} as never).schema.parse({})).toThrow();

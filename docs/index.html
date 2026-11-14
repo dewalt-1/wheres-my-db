@@ -65,6 +65,9 @@
   td.t, td.d { white-space: nowrap; text-align: right; padding-left: 8px; font-variant-numeric: tabular-nums; }
   tr.passed td { color: var(--muted); }
   tr.here td { color: var(--route); font-weight: 600; }
+  tr.mine td { font-weight: 700; }
+  tr.mine td:first-child::after { content: "  ← you board here"; color: var(--route); font-weight: 600; }
+  .mine-summary { margin: 0 0 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; }
   .d.late { color: var(--late); } .d.very { color: var(--very-late); }
   .note { color: var(--muted); font-size: 12px; }
   a { color: var(--route); }
@@ -210,7 +213,13 @@ function draw() {
     ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, 2 * Math.PI);
     ctx.fillStyle = stop.passed ? css("--route") : css("--bg"); ctx.fill();
     ctx.strokeStyle = css("--route"); ctx.lineWidth = 2; ctx.stroke();
-    label(stop.label, s.x + 10, s.y, css("--ink"));
+    if (stop.mine) {
+      ctx.beginPath(); ctx.arc(s.x, s.y, 11, 0, 2 * Math.PI);
+      ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.font = "700 13px system-ui, sans-serif";
+    }
+    label(stop.label, s.x + (stop.mine ? 16 : 10), s.y, css("--ink"));
+    ctx.font = "12px system-ui, sans-serif";
   }
 
   // Station names first: they orient the reader, so they win over train labels.
@@ -299,22 +308,27 @@ function stopRows(leg, now) {
     name: s.name, lat: s.lat, lon: s.lon, passed: passed[i],
     time: hhmm(s.scheduledDeparture || s.scheduledArrival),
     delay: minutes(s.scheduledArrival || s.scheduledDeparture, s.arrival || s.departure),
-    platform: s.track && s.scheduledTrack && s.track !== s.scheduledTrack ? `platform ${s.track} (was ${s.scheduledTrack})` : "",
+    // Current platform only: the feed's scheduled platform is often an internal code.
+    platform: s.track ? `platform ${s.track}` : "",
     cancelled: s.cancelled === true, leftAt: Date.parse(s.departure || s.arrival), arriveAt: Date.parse(s.arrival || s.departure),
   }));
 }
 
-function renderPanel(leg, rows, tripId, showRouteLink) {
+function renderPanel(leg, rows, tripId, showRouteLink, mine) {
   const last = rows.map((r) => r.passed).lastIndexOf(true);
+  const myStop = rows[mine];
+  const summary = myStop
+    ? `<p class="mine-summary"><strong>${esc(myStop.name)}</strong>: ${myStop.cancelled ? "stop cancelled" : myStop.delay >= 1 ? `about ${myStop.delay} min late` : "on time"}${myStop.passed ? " (the train has already left)" : ""}${myStop.platform ? `, ${esc(myStop.platform)}` : ""}</p>`
+    : "";
   const body = rows.map((r, i) => {
     const cls = r.delay >= 15 ? "d very" : r.delay >= 5 ? "d late" : "d";
     const delay = r.cancelled ? "cancelled" : r.delay >= 1 ? `+${r.delay} min` : "on time";
     const here = i === last && i < rows.length - 1 ? `<tr class="here"><td colspan="3">▼ train is around here</td></tr>` : "";
-    return `<tr class="${r.passed ? "passed" : ""}"><td>${r.passed ? "●" : "○"} ${esc(r.name)}${r.platform ? `<div class="note">${esc(r.platform)}</div>` : ""}</td><td class="t">${r.time}</td><td class="${cls}">${delay}</td></tr>${here}`;
+    return `<tr class="${[r.passed ? "passed" : "", i === mine ? "mine" : ""].join(" ").trim()}"><td>${r.passed ? "●" : "○"} ${esc(r.name)}</td><td class="t">${r.time}</td><td class="${cls}">${delay}</td></tr>${here}`;
   }).join("");
   const live = leg.realTime ? "live data" : "timetable only, no live data";
   const link = showRouteLink ? `<p><a href="?trip=${encodeURIComponent(tripId)}">Show this train's whole route</a></p>` : "";
-  panel.innerHTML = `<button class="close" aria-label="Close">×</button><h2>${esc(leg.displayName || leg.mode)} → ${esc(leg.headsign)}</h2><div class="sub">${live}${leg.cancelled ? " · this run is cancelled" : ""}</div>${link}<table>${body}</table>`;
+  panel.innerHTML = `<button class="close" aria-label="Close">×</button><h2>${esc(leg.displayName || leg.mode)} → ${esc(leg.headsign)}</h2><div class="sub">${live}${leg.cancelled ? " · this run is cancelled" : ""}</div>${summary}${link}<table>${body}</table>`;
   panel.classList.add("open");
   panel.querySelector(".close").onclick = () => { panel.classList.remove("open"); selectedTrip = null; draw(); };
   draw();
@@ -337,7 +351,12 @@ async function loadTrain(tripId, refit) {
   view.originLat = rows[0].lat; view.originLon = rows[0].lon;
   const stopPoints = rows.map((r) => project(r.lat, r.lon));
   const route = leg.legGeometry?.points ? decodePolyline(leg.legGeometry.points, leg.legGeometry.precision ?? 6) : stopPoints;
-  const stops = rows.map((r, i) => ({ p: stopPoints[i], passed: r.passed, label: `${r.name}${r.delay >= 1 ? `  +${r.delay}` : ""}` }));
+  const stopParam = params.get("stop");
+  const mine = stopParam !== null && /^\d+$/.test(stopParam) && Number(stopParam) < rows.length ? Number(stopParam) : -1;
+  // Put the user's stop first so its label wins over neighbouring ones.
+  const stops = rows
+    .map((r, i) => ({ p: stopPoints[i], passed: r.passed, mine: i === mine, label: `${r.name}${r.delay >= 1 ? `  +${r.delay}` : ""}${i === mine ? "  (you board here)" : ""}` }))
+    .sort((a, b) => Number(b.mine) - Number(a.mine));
   const trains = [];
   const last = rows.map((r) => r.passed).lastIndexOf(true);
   if (leg.realTime && last >= 0 && last < rows.length - 1) {
@@ -350,7 +369,7 @@ async function loadTrain(tripId, refit) {
   scene = { lines: [], trains, stops, places: [], route };
   if (refit) fit(stopPoints, 70);
   statusEl.textContent = `${leg.displayName || leg.mode} → ${leg.headsign}. Updated ${hhmm(new Date(now).toISOString())}.`;
-  renderPanel(leg, rows, tripId, false);
+  renderPanel(leg, rows, tripId, false, mine);
 }
 
 // ---- Interaction ----------------------------------------------------------

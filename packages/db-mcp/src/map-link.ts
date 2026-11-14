@@ -19,7 +19,12 @@ export function areaMapUrl(lat: number, lon: number, radiusKm: number, minDelayM
   return `${base()}?${params.toString()}`;
 }
 
-/** Map of one train's route. */
-export function trainMapUrl(tripId: string): string {
-  return `${base()}?${new URLSearchParams({ trip: tripId }).toString()}`;
+/**
+ * Map of one train's route. `boardingStopIndex` (position in the train's
+ * stop list) marks the stop where the user gets on.
+ */
+export function trainMapUrl(tripId: string, boardingStopIndex?: number): string {
+  const params = new URLSearchParams({ trip: tripId });
+  if (boardingStopIndex !== undefined) params.set("stop", String(boardingStopIndex));
+  return `${base()}?${params.toString()}`;
 }
