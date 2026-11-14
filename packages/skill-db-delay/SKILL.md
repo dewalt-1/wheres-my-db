@@ -104,13 +104,45 @@ Call `get_weather_risk` with the coordinates of the affected station when delays
 
 Weather is context, not a delay prediction. Say "an active storm warning may explain this" or "expect possible disruption on this corridor", never "you will be 15 minutes late because of heat". Level 1 warnings (e.g. light frost) rarely affect trains; don't alarm the user over them.
 
-## Showing the diagram
+## Showing the diagram and the map
 
-`get_train_status` and `get_late_trains` return a second text block: a ready-made, metro-style diagram (● passed stop, ○ stop ahead, ▼ or ▶ where the train is now).
+`get_train_status` and `get_late_trains` return a second text block: a ready-made, metro-style diagram (● passed stop, ○ stop ahead, ▼ or ▶ where the train is now), followed by a `Live map:` link.
 
-- Show it to the user exactly as received, inside a code block so the columns line up. Do not redraw, reorder or summarise it.
-- Put your verdict and reasoning above or below it; the diagram supports the answer, it doesn't replace it.
-- Show it whenever the user asks about one train's progress, asks to "see" or "show" something, or asks what is late in an area. Skip it for quick yes/no follow-ups.
+- Show the diagram exactly as received, inside a code block so the columns line up. Do not redraw, reorder or summarise it.
+- Give the map link on its own line after the diagram. It opens a live map in any browser, including on a phone. Copy the link exactly; never build or edit one yourself.
+- Put your verdict and reasoning above or below; the diagram supports the answer, it doesn't replace it.
+- Show both whenever the user asks about one train's progress, asks to "see" or "show" something, or asks what is late in an area. Skip them for quick yes/no follow-ups.
+
+## Watch mode: keeping the user posted
+
+When the user asks you to watch a train or a journey ("keep me posted", "tell me if anything changes", "watch my connection"):
+
+**How you can do it depends on where you are running.** Use whatever your environment already offers for running a task again later and for messaging the user: a scheduled or recurring task, a loop, a reminder, and the chat or messaging channel the user is already talking to you on. If you have no way to act again on your own, say so plainly and offer to re-check whenever they ask. Never promise updates you cannot send.
+
+**Set up**
+
+1. Pin down what to watch: the `tripId` of each train, the station where the user boards, and each transfer station. Resolve these now, while the user is here to answer questions.
+2. Take a baseline with `get_train_status` and tell the user the current state and that you'll message only when something changes.
+3. Remember the last values you reported: delay at the user's boarding stop and at each transfer, platforms, cancellations.
+
+**Each check**
+
+- Call `get_train_status` for each watched train. For a transfer, compare predicted arrival with the next train's predicted departure.
+- Check about every 5 minutes; every 2 minutes in the 15 minutes before the user boards or changes trains.
+
+**Message the user only when one of these happens**
+
+- The delay at their stop crosses 5, 10, 20, 30 or 60 minutes, in either direction.
+- The platform changes.
+- A train or their stop is cancelled.
+- A transfer drops under 5 minutes, becomes impossible, or becomes comfortable again.
+- Live data disappears (`realTime` turns false) or a check fails twice in a row.
+
+Otherwise stay silent. A message every few minutes saying "no change" is noise.
+
+**Message format:** one or two lines, the change first. Example: *"ICE 107 is now about 40 min late into Köln (was 25). Platform 6 instead of 88. Your S9 in Frankfurt still works, 17 min to change."* Add the map link when the delay is new or has jumped.
+
+**Stop** when the user arrives, the last watched train has passed their final stop, the user says stop, or the run is cancelled (report that, suggest alternatives with `plan_journey`, then stop). Tell the user when you stop.
 
 ## Expressing confidence
 

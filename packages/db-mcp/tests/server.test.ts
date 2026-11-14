@@ -51,6 +51,15 @@ describe("createServer", () => {
     expect(body(result)._meta.source).toBe("dwd");
   });
 
+  it("returns the diagram and map link as a second text block", async () => {
+    const result = await createServer({ providers: stubProviders() }).callTool("get_late_trains", { lat: 50.94, lon: 6.96 });
+    expect(result.content).toHaveLength(2);
+    expect(body(result)._meta.mapUrl).toContain("?lat=50.9400&lon=6.9600");
+    const diagram = (result.content[1] as { text: string }).text;
+    expect(diagram).toContain("0 of 0 trains late");
+    expect(diagram).toContain("Live map: https://dewalt-1.github.io/wheres-my-db/?lat=50.9400");
+  });
+
   it("turns a provider failure into a readable tool error", async () => {
     const result = await createServer({ providers: stubProviders() }).callTool("find_train", {
       name: "RB 10",
