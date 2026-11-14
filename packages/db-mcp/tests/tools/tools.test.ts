@@ -36,6 +36,7 @@ describe("pass-through tools", () => {
     expect(getTrainStatus).toHaveBeenCalledWith("t");
     expect(res.data).toEqual(status);
     expect(res.diagram).toContain("ICE 1 → Berlin");
+    expect(res.mapUrl).toBe("https://dewalt-1.github.io/wheres-my-db/?trip=t");
   });
 
   it("each tool rejects empty required input", () => {
@@ -130,6 +131,7 @@ describe("get_late_trains tool", () => {
     expect(res.data.trainsChecked).toBe(4);
     expect(res.data.lateTrains.map((t) => t.trainName)).toEqual(["very", "a-bit"]);
     expect(res.diagram).toContain("2 of 4 trains late");
+    expect(res.mapUrl).toBe("https://dewalt-1.github.io/wheres-my-db/?lat=50.9400&lon=6.9600&r=40&min=5");
   });
 
   it("turns centre + radius into a bounding box around the point", async () => {

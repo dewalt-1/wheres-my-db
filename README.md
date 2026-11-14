@@ -82,6 +82,8 @@ Both are independently testable. Both ship in this repo.
 - **The skill is honest about uncertainty.** Delay predictions are rounded to 5-minute buckets ("about 10–15 minutes late") because precision would be theater. It says which signals it used, what could change, and when it only has timetable data.
 - **7 atomic MCP tools, no reasoning baked in.** `resolve_station`, `get_departures`, `find_train`, `get_train_status`, `plan_journey`, `get_late_trains`, `get_weather_risk`. The skill composes them.
 - **Diagrams as plain text.** A train's route and the late trains in an area come back as a metro-style text diagram, because text is the one format every agent and chat app can display.
+- **A live map, as a link.** The same tools return a link to a small web page ([`docs/index.html`](./docs/index.html), served by GitHub Pages) that draws the trains around a station, coloured by delay, or one train's whole route. It reads the live data in the browser, so there is no server to run, and it works on a phone.
+- **Watch mode.** Ask the agent to keep you posted on a train or a connection. The skill tells it when to re-check and to message you only when something changes, using whatever scheduling and messaging your agent already has.
 - **A live smoke check.** Unit tests mock the network, so `npm run smoke -w db-mcp` calls every tool against the real services and fails loudly when an upstream API changes.
 
 ---
@@ -203,12 +205,14 @@ packages/
 │   │   ├── tools/           one file per MCP tool
 │   │   ├── clients/         Transitous (trains) + DWD (weather)
 │   │   ├── render.ts        plain-text route and late-train diagrams
+│   │   ├── map-link.ts      links to the live map page
 │   │   ├── cache.ts         LRU
 │   │   └── types.ts         normalized domain types
 │   ├── scripts/smoke.mjs    live check against the real services
 │   └── tests/               vitest + msw
 └── skill-db-delay/
     └── SKILL.md             the reasoning playbook
+docs/index.html              the live map page (GitHub Pages)
 ```
 
 ---
