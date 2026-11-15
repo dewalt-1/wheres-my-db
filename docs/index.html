@@ -339,43 +339,86 @@ async function showArea(mapReady, lat, lon, radiusKm, minDelay) {
   map.getSource("stations").setData(points([...stations.values()]));
 }
 
-function areaCard() {
+// Keep the address bar in sync where the page allows it (not in file snapshots).
+function setAddress(query) {
+  try { history.replaceState(null, "", `?${new URLSearchParams(query)}`); } catch { /* not allowed here */ }
+}
+
+function areaCard(goTo) {
   summary.innerHTML = `<form class="row" id="search" autocomplete="off">
       <input type="search" id="q" placeholder="Search a station" aria-label="Station"><button type="submit">Go</button>
     </form><ul id="results"></ul><div id="area">Loading…</div>
     <div class="legend"><span><i style="background:var(--late)"></i>5–14 min late</span><span><i style="background:var(--very-late)"></i>15+ min</span><span><i style="background:none;border:2px solid var(--very-late)"></i>likely stuck</span></div>`;
+  const input = document.getElementById("q");
   const results = document.getElementById("results");
-  document.getElementById("search").onsubmit = async (e) => {
+  let found = [];
+
+  const pick = (stop) => {
+    results.innerHTML = "";
+    input.value = stop.name;
+    input.blur();
+    goTo(stop);
+  };
+
+  // Suggestions while typing, so the user can pick one.
+  let timer = null, latest = 0;
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    const text = input.value.trim();
+    if (text.length < 2) { results.innerHTML = ""; found = []; return; }
+    timer = setTimeout(async () => {
+      const ticket = ++latest;
+      try {
+        const stops = (await getJson("/api/v1/geocode", { text, type: "STOP" })).filter((s) => s.type === "STOP").slice(0, 6);
+        if (ticket !== latest) return; // a newer search has started
+        found = stops;
+        results.innerHTML = stops.length
+          ? stops.map((s, i) => `<li><button type="button" data-i="${i}">${esc(s.name)}</button></li>`).join("")
+          : "<li><button type=\"button\" disabled>No station found</button></li>";
+      } catch (err) {
+        if (ticket === latest) results.innerHTML = `<li><button type="button" disabled>${esc(err.message)}</button></li>`;
+      }
+    }, 250);
+  });
+
+  // Enter or Go: take the best match straight away.
+  document.getElementById("search").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const text = document.getElementById("q").value.trim();
+    const text = input.value.trim();
     if (!text) return;
-    results.innerHTML = "<li><button disabled>Searching…</button></li>";
+    clearTimeout(timer);
+    results.innerHTML = "<li><button type=\"button\" disabled>Searching…</button></li>";
     try {
-      const stops = (await getJson("/api/v1/geocode", { text, type: "STOP" })).filter((s) => s.type === "STOP").slice(0, 6);
-      results.innerHTML = stops.length
-        ? stops.map((s) => `<li><button type="button" data-lat="${s.lat}" data-lon="${s.lon}">${esc(s.name)}</button></li>`).join("")
-        : "<li><button disabled>No station found</button></li>";
-    } catch (err) { results.innerHTML = `<li><button disabled>${esc(err.message)}</button></li>`; }
-  };
-  results.onclick = (e) => {
-    const b = e.target.closest("button[data-lat]");
-    if (b) location.search = `?lat=${b.dataset.lat}&lon=${b.dataset.lon}`;
-  };
+      const stops = (await getJson("/api/v1/geocode", { text, type: "STOP" })).filter((s) => s.type === "STOP");
+      if (stops.length) pick(stops[0]);
+      else results.innerHTML = "<li><button type=\"button\" disabled>No station found</button></li>";
+    } catch (err) { results.innerHTML = `<li><button type="button" disabled>${esc(err.message)}</button></li>`; }
+  });
+
+  results.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-i]");
+    if (b && found[Number(b.dataset.i)]) pick(found[Number(b.dataset.i)]);
+  });
 }
 
 // ---- Start -------------------------------------------------------------------
 
 (async () => {
-  const lat = Number(params.get("lat")) || 50.943, lon = Number(params.get("lon")) || 6.959; // default: Köln Hbf
+  // What is on screen. Search and "Follow this train" change it in place, no reload.
+  const view = {
+    trip: tripParam,
+    lat: Number(params.get("lat")) || 50.943, // default: Köln Hbf
+    lon: Number(params.get("lon")) || 6.959,
+  };
+  const { lat, lon } = view;
   const radius = Math.min(150, Math.max(5, Number(params.get("r")) || 40));
   const minDelay = Math.max(0, Number(params.get("min")) || 5);
-
-  if (!tripParam) areaCard();
+  const areaZoom = Math.log2(40000 / (radius * 2.2)) - 0.6;
 
   // The map starts loading in the background; live data does not wait for it.
   const mapReady = (async () => {
     const map = new maplibregl.Map({
-      container: "map", style: await loadStyle(), center: [lon, lat], zoom: tripParam ? 6 : Math.log2(40000 / (radius * 2.2)) - 0.6,
+      container: "map", style: await loadStyle(), center: [lon, lat], zoom: tripParam ? 6 : areaZoom,
       dragRotate: false, pitchWithRotate: false, attributionControl: false,
     });
     map.touchZoomRotate.disableRotation();
@@ -390,17 +433,28 @@ function areaCard() {
   let paused = false; // a tapped train's details stay until the next tap
   const refresh = async (first) => {
     try {
-      if (tripParam) await showTrain(mapReady, tripParam, first);
-      else if (!paused) await showArea(mapReady, lat, lon, radius, minDelay);
+      if (view.trip) await showTrain(mapReady, view.trip, first);
+      else if (!paused) await showArea(mapReady, view.lat, view.lon, radius, minDelay);
     } catch (err) {
       summary.innerHTML = `<div class="headline">Could not load live data</div><div class="meta">${esc(err.message)}</div>`;
     }
   };
 
-  if (!tripParam) mapReady.then((map) => {
+  const goTo = async (stop) => {
+    view.lat = stop.lat; view.lon = stop.lon; paused = false;
+    setAddress({ lat: stop.lat.toFixed(4), lon: stop.lon.toFixed(4) });
+    const area = document.getElementById("area");
+    if (area) area.innerHTML = `<div class="meta">Loading trains around ${esc(stop.name)}…</div>`;
+    (await mapReady).jumpTo({ center: [stop.lon, stop.lat], zoom: areaZoom });
+    refresh(false);
+  };
+  if (!tripParam) areaCard(goTo);
+
+  mapReady.then((map) => {
     map.on("mouseenter", "trains", () => { map.getCanvas().style.cursor = "pointer"; });
     map.on("mouseleave", "trains", () => { map.getCanvas().style.cursor = ""; });
     map.on("click", (e) => {
+      if (view.trip) return;
       const hit = map.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ["trains"] })[0];
       if (!hit) { paused = false; refresh(false); return; }
       const t = hit.properties;
@@ -408,7 +462,13 @@ function areaCard() {
       document.getElementById("area").innerHTML = `<div class="title">${esc(t.name)}</div>
         <div class="headline ${delayClass(t.delay)}">${esc(capital(delayText(t.delay)))}${t.to ? ` at ${esc(t.to)}` : ""}</div>
         <div class="meta">${t.stuck ? "Likely stuck: losing time between stops" : "Predicted for its next stop"}</div>
-        <div class="actions"><a class="button" href="?trip=${encodeURIComponent(t.tripId)}">Follow this train</a></div>`;
+        <div class="actions"><button type="button" id="follow">Follow this train</button></div>`;
+      document.getElementById("follow").onclick = () => {
+        view.trip = t.tripId;
+        setAddress({ trip: t.tripId });
+        map.getSource("stations").setData(points([]));
+        refresh(true);
+      };
     });
   });
 
