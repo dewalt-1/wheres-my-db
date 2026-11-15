@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Where's My DB? Live map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.css">
+<style>
+  :root {
+    --card: #ffffff; --ink: #1c1d1f; --muted: #686d75; --rule: #e2e3e6; --field: #f4f4f2;
+    --ok: #3d9a68; --late: #d98a00; --very-late: #c9302c; --accent: #1f5fa8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --card: #1d1f23; --ink: #eceef1; --muted: #9ea4ac; --rule: #32363c; --field: #26292e;
+      --ok: #56b98a; --late: #f0a92c; --very-late: #f0625c; --accent: #86b8ee;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--card); }
+  #map { position: absolute; inset: 0; }
+  #card {
+    position: absolute; top: 12px; left: 12px; width: 320px; max-height: calc(100% - 24px);
+    display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--rule);
+    border-radius: 10px; box-shadow: 0 2px 12px rgba(0, 0, 0, .14); overflow: hidden;
+  }
+  #summary { padding: 12px 14px; }
+  .title { font-weight: 600; }
+  .headline { font-size: 19px; font-weight: 700; line-height: 1.25; margin: 4px 0 2px; }
+  .headline.late { color: var(--late); } .headline.very { color: var(--very-late); } .headline.ok { color: var(--ok); }
+  .meta { color: var(--muted); font-size: 13px; }
+  .row { display: flex; gap: 6px; margin-bottom: 8px; position: relative; }
+  input[type=search] {
+    flex: 1; min-width: 0; padding: 7px 10px; font: inherit; color: var(--ink);
+    background: var(--field); border: 1px solid var(--rule); border-radius: 6px;
+  }
+  button, .button {
+    font: inherit; font-size: 14px; padding: 6px 11px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--rule); background: var(--field); color: var(--ink); text-decoration: none; display: inline-block;
+  }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  #results { list-style: none; margin: 0 0 8px; padding: 0; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+  #results:empty { display: none; }
+  #results button { display: block; width: 100%; text-align: left; border: 0; border-radius: 0; background: none; }
+  #results button:hover, #results button:focus { background: var(--field); }
+  .legend { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+  #stops { border-top: 1px solid var(--rule); overflow: auto; padding: 8px 14px 12px; display: none; }
+  #stops.open { display: block; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  td { padding: 3px 0; vertical-align: top; }
+  td.t, td.d { white-space: nowrap; text-align: right; padding-left: 8px; font-variant-numeric: tabular-nums; }
+  tr.passed td { color: var(--muted); }
+  tr.here td { color: var(--accent); font-weight: 600; }
+  tr.mine td { font-weight: 700; }
+  .d.late { color: var(--late); } .d.very { color: var(--very-late); }
+  @media (max-width: 640px) {
+    #card { top: auto; bottom: 0; left: 0; width: 100%; max-height: 55%; border-radius: 14px 14px 0 0; border-width: 1px 0 0; }
+  }
+</style>
+</head>
+<body>
+<div id="map" aria-label="Map"></div>
+<section id="card">
+  <div id="summary" aria-live="polite">Loading…</div>
+  <div id="stops"></div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js"></script>
+<script>
+"use strict";
+const API = "https://api.transitous.org";
+const TILES = "https://tiles.openfreemap.org";
+const RAIL = new Set(["HIGHSPEED_RAIL", "LONG_DISTANCE", "NIGHT_RAIL", "REGIONAL_FAST_RAIL", "REGIONAL_RAIL", "SUBURBAN", "SUBWAY", "TRAM"]);
+const STUCK_GAIN_MIN = 10;
+const REFRESH_MS = 60000;
+const KM_PER_DEG = 111;
+
+const params = new URLSearchParams(location.search);
+const tripParam = params.get("trip");
+const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+const narrow = window.matchMedia("(max-width: 640px)").matches;
+const C = dark
+  ? { rail: "#8b93a0", railMinor: "#555c66", route: "#86b8ee", ink: "#eceef1", halo: "#111214", dot: "#1d1f23", ok: "#56b98a", late: "#f0a92c", very: "#f0625c", muted: "#9ea4ac" }
+  : { rail: "#5d6672", railMinor: "#a9afb8", route: "#1f5fa8", ink: "#1c1d1f", halo: "#ffffff", dot: "#ffffff", ok: "#3d9a68", late: "#d98a00", very: "#c9302c", muted: "#686d75" };
+
+const summary = document.getElementById("summary");
+const stopsEl = document.getElementById("stops");
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const minutes = (a, b) => (a && b ? Math.round((Date.parse(b) - Date.parse(a)) / 60000) : 0);
+const hhmm = (v) => (v ? new Date(v).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }) : "");
+const delayText = (min) => (min >= 1 ? `about ${min} min late` : "on time");
+const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const delayClass = (min) => (min >= 15 ? "very" : min >= 5 ? "late" : "ok");
+const points = (features) => ({ type: "FeatureCollection", features });
+const point = (lon, lat, properties) => ({ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties });
+
+async function getJson(path, query) {
+  const res = await fetch(`${API}${path}?${new URLSearchParams(query)}`);
+  if (!res.ok) throw new Error(`The data service answered with an error (${res.status}).`);
+  return res.json();
+}
+
+function decodePolyline(str, precision) {
+  const factor = 10 ** precision, out = [];
+  let i = 0, lat = 0, lon = 0;
+  while (i < str.length) {
+    for (let k = 0; k < 2; k++) {
+      let result = 0, shift = 0, b;
+      do { b = str.charCodeAt(i++) - 63; result |= (b & 31) << shift; shift += 5; } while (b >= 32);
+      const delta = result & 1 ? ~(result >> 1) : result >> 1;
+      if (k === 0) lat += delta; else lon += delta;
+    }
+    out.push([lon / factor, lat / factor]);
+  }
+  return out;
+}
+
+// Point at fraction f (0..1) along a list of [lon, lat] coordinates.
+function along(coords, f) {
+  if (coords.length < 2) return coords[0];
+  const lengths = [];
+  let total = 0;
+  for (let i = 1; i < coords.length; i++) {
+    const d = Math.hypot(coords[i][0] - coords[i - 1][0], coords[i][1] - coords[i - 1][1]);
+    lengths.push(d); total += d;
+  }
+  let target = total * Math.min(1, Math.max(0, f));
+  for (let i = 0; i < lengths.length; i++) {
+    if (target <= lengths[i] || i === lengths.length - 1) {
+      const t = lengths[i] ? target / lengths[i] : 0;
+      return [coords[i][0] + (coords[i + 1][0] - coords[i][0]) * t, coords[i][1] + (coords[i + 1][1] - coords[i][1]) * t];
+    }
+    target -= lengths[i];
+  }
+  return coords[coords.length - 1];
+}
+
+// Index of the vertex in `coords` closest to [lon, lat].
+function nearestVertex(coords, lon, lat) {
+  let best = 0, bestD = Infinity;
+  for (let i = 0; i < coords.length; i++) {
+    const d = (coords[i][0] - lon) ** 2 + (coords[i][1] - lat) ** 2;
+    if (d < bestD) { best = i; bestD = d; }
+  }
+  return best;
+}
+
+// ---- Basemap: OpenFreeMap (OpenStreetMap data), restyled so tracks lead ----
+
+async function loadStyle() {
+  try {
+    const style = await (await fetch(`${TILES}/styles/${dark ? "dark" : "positron"}`)).json();
+    // Drop the stock railway drawing (only visible when zoomed far in) and road clutter.
+    style.layers = style.layers.filter((l) => !/^railway|shield|oneway|^highway[-_]name/.test(l.id));
+    const rail = (id, minzoom, filter, color, widths) => ({
+      id, type: "line", source: "openmaptiles", "source-layer": "transportation", minzoom, filter,
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": color, "line-width": ["interpolate", ["linear"], ["zoom"], ...widths] },
+    });
+    const isRail = ["==", ["get", "class"], "rail"];
+    const tracks = [
+      rail("tracks-transit", 11, ["==", ["get", "class"], "transit"], C.railMinor, [11, 0.6, 14, 1.4, 18, 3]),
+      rail("tracks-sidings", 13, ["all", isRail, ["has", "service"]], C.railMinor, [13, 0.5, 18, 2]),
+      rail("tracks-main", 4, ["all", isRail, ["!", ["has", "service"]]], C.rail, [4, 0.5, 9, 1.2, 13, 2.2, 18, 5]),
+    ];
+    // Villages and suburbs only once zoomed in, so towns and tracks read first.
+    for (const l of style.layers) {
+      if (/village|suburb/.test(l.id)) l.minzoom = Math.max(l.minzoom || 0, 10.5);
+      if (/label_other|place_other/.test(l.id)) l.minzoom = Math.max(l.minzoom || 0, 12);
+    }
+    const firstLabel = style.layers.findIndex((l) => l.type === "symbol");
+    style.layers.splice(firstLabel < 0 ? style.layers.length : firstLabel, 0, ...tracks);
+    return style;
+  } catch {
+    // Basemap unreachable: plain background, the route and trains still draw.
+    return { version: 8, sources: {}, layers: [{ id: "background", type: "background", paint: { "background-color": dark ? "#0f1012" : "#f2f3f0" } }] };
+  }
+}
+
+function addOverlays(map) {
+  for (const id of ["route", "stations", "stops", "trains"]) map.addSource(id, { type: "geojson", data: points([]) });
+  const text = (extra) => ({
+    "text-font": ["Noto Sans Regular"], "text-size": 12, "text-anchor": "left", "text-offset": [0.9, 0],
+    "text-max-width": 14, "text-justify": "left", "text-line-height": 1.35, ...extra,
+  });
+  const halo = { "text-color": C.ink, "text-halo-color": C.halo, "text-halo-width": 1.6 };
+  const hasGlyphs = Boolean(map.getStyle().glyphs);
+  const delayColour = ["step", ["get", "delay"], C.ok, 5, C.late, 15, C.very];
+
+  map.addLayer({ id: "route", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": C.route, "line-opacity": 0.55, "line-width": ["interpolate", ["linear"], ["zoom"], 5, 3, 12, 5, 16, 8] } });
+
+  map.addLayer({ id: "stations", type: "circle", source: "stations", minzoom: 9,
+    paint: { "circle-radius": 3, "circle-color": C.dot, "circle-stroke-color": C.rail, "circle-stroke-width": 1.5 } });
+  map.addLayer({ id: "stops", type: "circle", source: "stops",
+    paint: { "circle-radius": ["case", ["get", "mine"], 8, 4.5], "circle-color": ["case", ["get", "passed"], C.route, C.dot],
+      "circle-stroke-color": C.route, "circle-stroke-width": ["case", ["get", "mine"], 3.5, 2] } });
+
+  map.addLayer({ id: "trains-stuck", type: "circle", source: "trains", filter: ["get", "stuck"],
+    paint: { "circle-radius": 12, "circle-opacity": 0, "circle-stroke-color": C.very, "circle-stroke-width": 2 } });
+  map.addLayer({ id: "trains", type: "circle", source: "trains",
+    paint: { "circle-radius": ["case", ["get", "big"], 8, [">=", ["get", "delay"], 5], 5.5, 3],
+      "circle-color": delayColour, "circle-opacity": ["case", ["any", ["get", "big"], [">=", ["get", "delay"], 5]], 1, 0.55],
+      "circle-stroke-color": C.halo, "circle-stroke-width": ["case", ["get", "big"], 2.5, 1] } });
+
+  if (!hasGlyphs) return;
+  map.addLayer({ id: "station-names", type: "symbol", source: "stations", minzoom: 10,
+    layout: text({ "text-field": ["get", "name"], "text-size": 11, "symbol-sort-key": ["get", "rank"] }),
+    paint: { ...halo, "text-color": C.muted } });
+  map.addLayer({ id: "train-names", type: "symbol", source: "trains", filter: ["!=", ["get", "label"], ""],
+    layout: text({ "text-field": ["get", "label"], "symbol-sort-key": ["-", 0, ["get", "delay"]], "text-font": ["Noto Sans Bold"] }),
+    paint: halo });
+  // Added last: when labels collide, the user's stop wins over the train name.
+  map.addLayer({ id: "stop-names", type: "symbol", source: "stops",
+    layout: text({ "text-field": ["get", "label"], "symbol-sort-key": ["get", "rank"],
+      "text-font": ["case", ["get", "mine"], ["literal", ["Noto Sans Bold"]], ["literal", ["Noto Sans Regular"]]],
+      "text-size": ["case", ["get", "mine"], 14, 12], "text-offset": ["case", ["get", "mine"], ["literal", [1.1, 0]], ["literal", [0.9, 0]]] }),
+    paint: halo });
+}
+
+// ---- Train view: the user's own train --------------------------------------
+
+function stopRows(leg, now) {
+  return [leg.from, ...(leg.intermediateStops || []), leg.to].map((s) => ({
+    name: s.name, lat: s.lat, lon: s.lon, platform: s.track || "", cancelled: s.cancelled === true,
+    passed: Date.parse(s.departure || s.arrival) <= now,
+    time: hhmm(s.scheduledDeparture || s.scheduledArrival),
+    delay: minutes(s.scheduledArrival || s.scheduledDeparture, s.arrival || s.departure),
+    leftAt: Date.parse(s.departure || s.arrival), arriveAt: Date.parse(s.arrival || s.departure),
+  }));
+}
+
+function stopTable(rows, mine) {
+  const last = rows.map((r) => r.passed).lastIndexOf(true);
+  return `<table>${rows.map((r, i) => {
+    const delay = r.cancelled ? "cancelled" : r.delay >= 1 ? `+${r.delay} min` : "on time";
+    const here = i === last && i < rows.length - 1 ? `<tr class="here"><td colspan="3">▼ train is around here</td></tr>` : "";
+    return `<tr class="${[r.passed ? "passed" : "", i === mine ? "mine" : ""].join(" ").trim()}"><td>${r.passed ? "●" : "○"} ${esc(r.name)}${i === mine ? " (your stop)" : ""}</td><td class="t">${r.time}</td><td class="d ${r.delay >= 5 ? delayClass(r.delay) : ""}">${delay}</td></tr>${here}`;
+  }).join("")}</table>`;
+}
+
+async function showTrain(mapReady, tripId, refit) {
+  const notFound = "That train run was not found. It may have finished, or the link is from another day.";
+  const leg = (await getJson("/api/v5/trip", { tripId }).catch(() => { throw new Error(notFound); })).legs?.[0];
+  if (!leg) throw new Error(notFound);
+  const now = Date.now(), rows = stopRows(leg, now);
+  const stopParam = params.get("stop");
+  const mine = stopParam !== null && /^\d+$/.test(stopParam) && Number(stopParam) < rows.length ? Number(stopParam) : -1;
+  const last = rows.map((r) => r.passed).lastIndexOf(true);
+  const next = last < rows.length - 1 ? last + 1 : -1;
+  const name = leg.displayName || leg.mode;
+
+  const coords = leg.legGeometry?.points ? decodePolyline(leg.legGeometry.points, leg.legGeometry.precision ?? 6) : rows.map((r) => [r.lon, r.lat]);
+
+  // Train position: between the last stop it left and the next one.
+  let train = null;
+  if (leg.realTime && last >= 0 && next >= 0) {
+    const a = rows[last], b = rows[next];
+    const f = b.arriveAt > a.leftAt ? Math.min(1, Math.max(0, (now - a.leftAt) / (b.arriveAt - a.leftAt))) : 0;
+    // Follow the route line between the two stops, so the marker sits on the track.
+    const ia = nearestVertex(coords, a.lon, a.lat), ib = nearestVertex(coords, b.lon, b.lat);
+    train = ib > ia ? along(coords.slice(ia, ib + 1), f) : [a.lon + (b.lon - a.lon) * f, a.lat + (b.lat - a.lat) * f];
+  } else if (leg.realTime && last === -1) {
+    train = [rows[0].lon, rows[0].lat];
+  }
+  // Card first: the one thing the user came for, then where the train is.
+  // It does not wait for the map.
+  const focus = mine >= 0 ? rows[mine] : next >= 0 ? rows[next] : rows[rows.length - 1];
+  const headline = focus.cancelled ? "Stop cancelled" : `${capital(delayText(focus.delay))} at ${focus.name}`;
+  const where = !leg.realTime ? "Timetable only, no live position"
+    : last === -1 ? `Not departed yet from ${rows[0].name}`
+    : next === -1 ? "Arrived at its last stop"
+    : `Now between ${rows[last].name} and ${rows[next].name}`;
+  const facts = [where];
+  if (mine >= 0 && focus.platform) facts.unshift(`Platform ${focus.platform}`);
+  if (mine >= 0 && focus.passed) facts.unshift("The train has already left your stop");
+  summary.innerHTML = `<div class="title">${esc(name)} → ${esc(leg.headsign)}</div>
+    <div class="headline ${leg.cancelled || focus.cancelled ? "very" : delayClass(focus.delay)}">${leg.cancelled ? "This run is cancelled" : esc(headline)}</div>
+    <div class="meta">${facts.map(esc).join(" · ")}</div>
+    <div class="meta">Updated ${hhmm(now)}</div>
+    <div class="actions"><button id="toggle" aria-expanded="${stopsEl.classList.contains("open")}">All stops</button></div>`;
+  stopsEl.innerHTML = stopTable(rows, mine);
+  document.getElementById("toggle").onclick = (e) => e.currentTarget.setAttribute("aria-expanded", String(stopsEl.classList.toggle("open")));
+
+  // Map: route line and stops. Only the stops that matter are named at first;
+  // the rest get names as you zoom in and space allows.
+  const map = await mapReady;
+  map.getSource("route").setData({ type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} });
+  map.getSource("stops").setData(points(rows.map((r, i) => {
+    const key = i === mine || i === next || i === 0 || i === rows.length - 1;
+    const label = i === mine ? `${r.name}\n${r.cancelled ? "stop cancelled" : delayText(r.delay)}` : r.name;
+    return point(r.lon, r.lat, { label, mine: i === mine, passed: r.passed, rank: i === mine ? 0 : key ? 1 : 5 });
+  })));
+  map.getSource("trains").setData(points(train ? [point(train[0], train[1], { delay: rows[next >= 0 ? next : rows.length - 1].delay, big: true, stuck: false, label: name })] : []));
+
+  if (refit) {
+    // Frame the part that matters: from the train to the user's stop. Otherwise the whole route.
+    const useful = train && mine >= 0 && !rows[mine].passed ? [train, [rows[mine].lon, rows[mine].lat]] : coords;
+    const bounds = useful.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(useful[0], useful[0]));
+    map.fitBounds(bounds, { padding: narrow ? { top: 70, right: 60, bottom: 280, left: 60 } : { top: 110, right: 140, bottom: 110, left: 400 }, maxZoom: 12, duration: 0 });
+  }
+}
+
+// ---- Area view: trains around a station -------------------------------------
+
+async function showArea(mapReady, lat, lon, radiusKm, minDelay) {
+  const dLat = radiusKm / KM_PER_DEG, dLon = radiusKm / (KM_PER_DEG * Math.cos((lat * Math.PI) / 180));
+  const now = Date.now();
+  const segments = await getJson("/api/v5/map/trips", {
+    zoom: 10, min: `${lat - dLat},${lon - dLon}`, max: `${lat + dLat},${lon + dLon}`,
+    startTime: new Date(now).toISOString(), endTime: new Date(now + 60000).toISOString(),
+  });
+  const byTrip = new Map(), stations = new Map();
+  for (const seg of segments) {
+    if (!RAIL.has(seg.mode) || !seg.polyline || !seg.trips?.[0]) continue;
+    for (const stop of [seg.from, seg.to]) {
+      const inside = stop && Math.abs(stop.lat - lat) <= dLat && Math.abs(stop.lon - lon) <= dLon;
+      if (inside && stop.name && !stations.has(stop.name)) stations.set(stop.name, point(stop.lon, stop.lat, { name: stop.name, rank: -(stop.importance || 0) }));
+    }
+    const dep = Date.parse(seg.departure), arr = Date.parse(seg.arrival);
+    const progress = arr > dep ? Math.min(1, Math.max(0, (now - dep) / (arr - dep))) : 0;
+    const delay = minutes(seg.scheduledArrival, seg.arrival);
+    const stuck = delay - minutes(seg.scheduledDeparture, seg.departure) >= STUCK_GAIN_MIN;
+    const name = seg.trips[0].displayName || seg.mode;
+    const [x, y] = along(decodePolyline(seg.polyline, 5), progress);
+    const train = point(x, y, { tripId: seg.trips[0].tripId, name, delay, stuck, big: false, to: seg.to?.name || "", label: delay >= 15 ? `${name} +${delay}` : "" });
+    if (!byTrip.has(train.properties.tripId) || (now >= dep && now <= arr)) byTrip.set(train.properties.tripId, train);
+  }
+  const trains = [...byTrip.values()].sort((a, b) => a.properties.delay - b.properties.delay);
+  const late = trains.filter((t) => t.properties.delay >= minDelay).length;
+  const stuck = trains.filter((t) => t.properties.stuck).length;
+  document.getElementById("area").innerHTML = `<div class="headline">${late} of ${trains.length} trains late</div>
+    <div class="meta">${stuck} likely stuck · updated ${hhmm(now)} · tap a train</div>`;
+
+  const map = await mapReady;
+  map.getSource("trains").setData(points(trains));
+  map.getSource("stations").setData(points([...stations.values()]));
+}
+
+// Keep the address bar in sync where the page allows it (not in file snapshots).
+function setAddress(query) {
+  try { history.replaceState(null, "", `?${new URLSearchParams(query)}`); } catch { /* not allowed here */ }
+}
+
+function areaCard(goTo) {
+  summary.innerHTML = `<form class="row" id="search" autocomplete="off">
+      <input type="search" id="q" placeholder="Search a station" aria-label="Station"><button type="submit">Go</button>
+    </form><ul id="results"></ul><div id="area">Loading…</div>
+    <div class="legend"><span><i style="background:var(--late)"></i>5–14 min late</span><span><i style="background:var(--very-late)"></i>15+ min</span><span><i style="background:none;border:2px solid var(--very-late)"></i>likely stuck</span></div>`;
+  const input = document.getElementById("q");
+  const results = document.getElementById("results");
+  let found = [];
+
+  const pick = (stop) => {
+    results.innerHTML = "";
+    input.value = stop.name;
+    input.blur();
+    goTo(stop);
+  };
+
+  // Suggestions while typing, so the user can pick one.
+  let timer = null, latest = 0;
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    const text = input.value.trim();
+    if (text.length < 2) { results.innerHTML = ""; found = []; return; }
+    timer = setTimeout(async () => {
+      const ticket = ++latest;
+      try {
+        const stops = (await getJson("/api/v1/geocode", { text, type: "STOP" })).filter((s) => s.type === "STOP").slice(0, 6);
+        if (ticket !== latest) return; // a newer search has started
+        found = stops;
+        results.innerHTML = stops.length
+          ? stops.map((s, i) => `<li><button type="button" data-i="${i}">${esc(s.name)}</button></li>`).join("")
+          : "<li><button type=\"button\" disabled>No station found</button></li>";
+      } catch (err) {
+        if (ticket === latest) results.innerHTML = `<li><button type="button" disabled>${esc(err.message)}</button></li>`;
+      }
+    }, 250);
+  });
+
+  // Enter or Go: take the best match straight away.
+  document.getElementById("search").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    clearTimeout(timer);
+    results.innerHTML = "<li><button type=\"button\" disabled>Searching…</button></li>";
+    try {
+      const stops = (await getJson("/api/v1/geocode", { text, type: "STOP" })).filter((s) => s.type === "STOP");
+      if (stops.length) pick(stops[0]);
+      else results.innerHTML = "<li><button type=\"button\" disabled>No station found</button></li>";
+    } catch (err) { results.innerHTML = `<li><button type="button" disabled>${esc(err.message)}</button></li>`; }
+  });
+
+  results.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-i]");
+    if (b && found[Number(b.dataset.i)]) pick(found[Number(b.dataset.i)]);
+  });
+}
+
+// ---- Start -------------------------------------------------------------------
+
+(async () => {
+  // What is on screen. Search and "Follow this train" change it in place, no reload.
+  const view = {
+    trip: tripParam,
+    lat: Number(params.get("lat")) || 50.943, // default: Köln Hbf
+    lon: Number(params.get("lon")) || 6.959,
+  };
+  const { lat, lon } = view;
+  const radius = Math.min(150, Math.max(5, Number(params.get("r")) || 40));
+  const minDelay = Math.max(0, Number(params.get("min")) || 5);
+  const areaZoom = Math.log2(40000 / (radius * 2.2)) - 0.6;
+
+  // The map starts loading in the background; live data does not wait for it.
+  const mapReady = (async () => {
+    const map = new maplibregl.Map({
+      container: "map", style: await loadStyle(), center: [lon, lat], zoom: tripParam ? 6 : areaZoom,
+      dragRotate: false, pitchWithRotate: false, attributionControl: false,
+    });
+    map.touchZoomRotate.disableRotation();
+    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: 'Train data: <a href="https://transitous.org">Transitous</a>' }), narrow ? "top-right" : "bottom-right");
+    if (!narrow) map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    await new Promise((resolve) => map.once("style.load", resolve));
+    addOverlays(map);
+    window.__map = map; // for checking in the browser console
+    return map;
+  })();
+
+  let paused = false; // a tapped train's details stay until the next tap
+  const refresh = async (first) => {
+    try {
+      if (view.trip) await showTrain(mapReady, view.trip, first);
+      else if (!paused) await showArea(mapReady, view.lat, view.lon, radius, minDelay);
+    } catch (err) {
+      summary.innerHTML = `<div class="headline">Could not load live data</div><div class="meta">${esc(err.message)}</div>`;
+    }
+  };
+
+  const goTo = async (stop) => {
+    view.lat = stop.lat; view.lon = stop.lon; paused = false;
+    setAddress({ lat: stop.lat.toFixed(4), lon: stop.lon.toFixed(4) });
+    const area = document.getElementById("area");
+    if (area) area.innerHTML = `<div class="meta">Loading trains around ${esc(stop.name)}…</div>`;
+    (await mapReady).jumpTo({ center: [stop.lon, stop.lat], zoom: areaZoom });
+    refresh(false);
+  };
+  if (!tripParam) areaCard(goTo);
+
+  mapReady.then((map) => {
+    map.on("mouseenter", "trains", () => { map.getCanvas().style.cursor = "pointer"; });
+    map.on("mouseleave", "trains", () => { map.getCanvas().style.cursor = ""; });
+    map.on("click", (e) => {
+      if (view.trip) return;
+      const hit = map.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ["trains"] })[0];
+      if (!hit) { paused = false; refresh(false); return; }
+      const t = hit.properties;
+      paused = true;
+      document.getElementById("area").innerHTML = `<div class="title">${esc(t.name)}</div>
+        <div class="headline ${delayClass(t.delay)}">${esc(capital(delayText(t.delay)))}${t.to ? ` at ${esc(t.to)}` : ""}</div>
+        <div class="meta">${t.stuck ? "Likely stuck: losing time between stops" : "Predicted for its next stop"}</div>
+        <div class="actions"><button type="button" id="follow">Follow this train</button></div>`;
+      document.getElementById("follow").onclick = () => {
+        view.trip = t.tripId;
+        setAddress({ trip: t.tripId });
+        map.getSource("stations").setData(points([]));
+        refresh(true);
+      };
+    });
+  });
+
+  await refresh(true);
+  setInterval(() => refresh(false), REFRESH_MS);
+})();
+</script>
+</body>
+</html>

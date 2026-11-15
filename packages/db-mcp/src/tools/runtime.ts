@@ -11,12 +11,17 @@ export interface ToolDef<TInput> {
 // Turns a SourcedResponse into the MCP CallToolResult shape, embedding the
 // data source as _meta so the skill can say where an answer came from.
 export function asResult(res: SourcedResponse<unknown>): CallToolResult {
-  const body = { data: res.data, _meta: { source: res.source } };
+  const meta: { source: string; mapUrl?: string } = { source: res.source };
+  if (res.mapUrl) meta.mapUrl = res.mapUrl;
+  const body = { data: res.data, _meta: meta };
   const content: CallToolResult["content"] = [
     { type: "text", text: JSON.stringify(body, null, 2) },
   ];
   // A second block keeps the diagram's real line breaks, ready to paste.
-  if (res.diagram) content.push({ type: "text", text: res.diagram });
+  if (res.diagram) {
+    const link = res.mapUrl ? `\n\nLive map: ${res.mapUrl}` : "";
+    content.push({ type: "text", text: `${res.diagram}${link}` });
+  }
   return { content };
 }
 

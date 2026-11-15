@@ -22,15 +22,21 @@ const status: TrainStatus = {
 };
 
 describe("renderTrainStrip", () => {
-  it("marks passed stops, the train's position, delays and platform changes", () => {
+  it("marks passed stops, the train's position and delays", () => {
     const text = renderTrainStrip(status, Date.parse("2026-11-13T11:30:00Z"));
     expect(text.split("\n")).toEqual([
       "ICE 107 → Basel SBB  (live)",
       " ●  Dortmund Hbf                   11:00  +10 min",
       " ●  Düsseldorf Hbf                 11:52  +25 min",
       " ▼  train is around here",
-      " ○  Köln Hbf                       12:15  +39 min  platform 6 (was 88)",
+      " ○  Köln Hbf                       12:15  +39 min",
     ]);
+  });
+
+  it("marks the stop where the user boards", () => {
+    const lines = renderTrainStrip(status, Date.parse("2026-11-13T11:30:00Z"), 2).split("\n");
+    expect(lines[4]).toBe(" ○  Köln Hbf                       12:15  +39 min  platform 6, ← you board here");
+    expect(lines.filter((l) => l.includes("you board here"))).toHaveLength(1);
   });
 
   it("says when the train has not departed and when there is no live data", () => {

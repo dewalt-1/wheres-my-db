@@ -36,7 +36,11 @@ function delayLabel(minutes: number | undefined): string {
  * One train's route as a vertical line: ● stops already passed, ○ stops
  * ahead, ▼ where the train is now, with the delay at every stop.
  */
-export function renderTrainStrip(status: TrainStatus, now: number = Date.now()): string {
+export function renderTrainStrip(
+  status: TrainStatus,
+  now: number = Date.now(),
+  boardingStopIndex?: number,
+): string {
   const lines: string[] = [];
   const liveNote = status.realTime ? "live" : "timetable only, no live data";
   lines.push(`${status.name} → ${status.headsign}  (${liveNote})`);
@@ -54,8 +58,12 @@ export function renderTrainStrip(status: TrainStatus, now: number = Date.now()):
     const delay = delayLabel(stop.arrivalDelayMinutes ?? stop.departureDelayMinutes);
     const notes: string[] = [];
     if (stop.cancelled) notes.push("stop cancelled");
-    if (stop.track && stop.scheduledTrack && stop.track !== stop.scheduledTrack) {
-      notes.push(`platform ${stop.track} (was ${stop.scheduledTrack})`);
+    // Only the current platform is shown. The feed's "scheduled" platform is
+    // often an internal code (e.g. 88, 89), so a "changed from" claim would
+    // raise false alarms.
+    if (i === boardingStopIndex) {
+      if (stop.track) notes.push(`platform ${stop.track}`);
+      notes.push("← you board here");
     }
     const row = ` ${marker}  ${fit(stop.stationName, NAME_WIDTH)} ${time}  ${delay.padEnd(8)} ${notes.join(", ")}`;
     lines.push(row.trimEnd());

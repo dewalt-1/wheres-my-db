@@ -8,6 +8,8 @@ export interface SourcedResponse<T> {
   source: DataSource;
   /** Optional plain-text diagram of the data, for the agent to show as-is. */
   diagram?: string;
+  /** Optional link to the live map showing the same data. */
+  mapUrl?: string;
 }
 
 export interface Station {
