@@ -40,6 +40,16 @@ if (koeln) {
     await check("find_train", "find_train", { name: first.trainName, stationId: koeln.id }, (d) => `${d.length} run(s) of ${first.trainName}`);
     await check("get_train_status", "get_train_status", { tripId: first.tripId }, (d) => `${d.name}: ${d.stopovers.length} stops, live=${d.realTime}`);
   }
+  // Optional DB notices: only checked when a DB API key is configured.
+  const dbTrain = board?.find((d) => ["HIGHSPEED_RAIL", "LONG_DISTANCE", "REGIONAL_FAST_RAIL", "REGIONAL_RAIL", "SUBURBAN"].includes(d.mode));
+  if (dbTrain) {
+    await check("get_train_status + DB notices", "get_train_status", { tripId: dbTrain.tripId, boardLat: koeln.lat, boardLon: koeln.lon }, (d) => {
+      const n = d.boardingNotices;
+      if (n.status === "off") return "skipped (no DB API key configured)";
+      if (n.status !== "ok") throw new Error(`DB notices: ${n.status}${n.message ? ` (${n.message})` : ""}`);
+      return `${n.notices.length} DB notice(s) for ${d.name} at ${n.station}`;
+    });
+  }
   if (frankfurt) {
     await check("plan_journey", "plan_journey", { fromStationId: koeln.id, toStationId: frankfurt.id }, (d) => `${d.length} options, ${d.reduce((n, o) => n + o.riskyTransfers.length, 0)} risky transfer(s)`);
   }

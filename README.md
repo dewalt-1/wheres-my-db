@@ -78,6 +78,7 @@ Both are independently testable. Both ship in this repo.
 
 - **Live data for every kind of train.** Train data comes from [Transitous](https://transitous.org), an open, community-run service built on public timetable and realtime feeds. It covers long-distance, regional, S-Bahn, U-Bahn and tram, with the delay at every stop of a run.
 - **Late and stuck trains in an area.** One tool lists the trains currently running late around a point, with an estimated position, and flags those losing 10+ minutes between two stops as likely stuck.
+- **Optional DB notices.** With a free DB API key, answers also show what DB has posted for your train at your stop: delay reasons ("Repair to a signal"), missing catering, missing coaches, bike spaces, construction work. See [Using the DB API](#using-the-db-api-optional).
 - **Weather context.** A separate client asks DWD (Deutscher Wetterdienst) for the official warnings covering a station's exact location, so the agent can explain delays and check conditions for a planned trip.
 - **The skill is honest about uncertainty.** Delay predictions are rounded to 5-minute buckets ("about 10–15 minutes late") because precision would be theater. It says which signals it used, what could change, and when it only has timetable data.
 - **7 atomic MCP tools, no reasoning baked in.** `resolve_station`, `get_departures`, `find_train`, `get_train_status`, `plan_journey`, `get_late_trains`, `get_weather_risk`. The skill composes them.
@@ -195,6 +196,73 @@ The server is a stdio MCP — it speaks JSON-RPC over stdin/stdout per the [Mode
 
 ---
 
+## Using the DB API (optional)
+
+Everything above works without any account. If you add a free key for Deutsche Bahn's own timetable API, answers about your train also show the notices DB has posted for it at your stop, the small things that add up:
+
+```
+DB notices at Hamm (Westf), Hauptbahnhof:
+ • Repair to a signal
+ • Delay from its previous journey
+ • No food or drink available
+```
+
+These include delay reasons, catering, missing or reordered coaches, seat reservations, bike spaces, accessibility and construction work. Without a key you simply don't get this list; nothing else changes.
+
+### 1. Get a free key
+
+1. Register at the [DB API Marketplace](https://developers.deutschebahn.com/db-api-marketplace/apis/start). It uses a DB customer account (the same as a bahn.de login) and confirms your email with a code.
+2. Create an application ("Neue Anwendung erstellen"). Only the title is required; leave the certificate and redirect URL empty.
+   - If saving fails with an error about `application_public_certificate_entry`, paste a throwaway certificate into the certificate field. It is never used for this API. To make one: `openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 730 -subj "/CN=wheres-my-db"`, then paste the contents of `cert.pem`.
+3. Copy the **Client ID** and the **Client Secret**. The secret is shown only once.
+4. In the catalogue, open **Timetables**, choose the **Free** plan, click **Abonnieren** (subscribe) and select your application.
+
+### 2. Add the key
+
+**Option A: the setup command (recommended).** In a terminal, in this repository:
+
+```bash
+npm run setup-db-api
+```
+
+It asks for the Client ID and the Client Secret (hidden as you type), checks them with DB, and saves them to `~/.config/wheres-my-db/db-api.json`, readable only by you. This works for every agent, because the server reads that file itself. Restart your agent afterwards.
+
+**Option B: environment variables in your agent's config.** The server also reads `DB_CLIENT_ID` and `DB_API_KEY`. For Claude Code:
+
+```bash
+claude mcp add db-mcp -s user -e DB_CLIENT_ID=your-client-id -e DB_API_KEY=your-client-secret -- node "$PWD/packages/db-mcp/dist/index.js"
+```
+
+For Claude Desktop, add an `env` block next to `command` and `args`:
+
+```json
+"env": { "DB_CLIENT_ID": "your-client-id", "DB_API_KEY": "your-client-secret" }
+```
+
+Codex, opencode and Hermes have an equivalent environment setting in their MCP config.
+
+Environment variables win over the saved file. While developing, a `.env` file at the repository root with the same two names also works; git ignores it.
+
+**Why a terminal command and not something you tell the agent?** Typing the key into a chat would send it through the AI conversation and its logs. The setup command keeps it on your machine.
+
+### 3. Check or remove it
+
+```bash
+npm run db-api-status
+```
+
+This says where the key was found and whether DB accepts it, without printing it. To delete the saved key: `node packages/db-mcp/dist/index.js remove-db-api`.
+
+### Good to know
+
+- **Limits:** the free plan allows 60 calls a minute. Lookups are cached (a station's notices for one minute), which is plenty for personal use.
+- **Scope:** notices are fetched for the stop where you board, when the agent knows it.
+- **Each user needs their own key.** Keys are personal; don't put yours in the repository or share it.
+- **Change ahead:** DB has announced that this API will be replaced by a new one ("OpenBoards"); the client may need updating when that happens.
+- **Licence:** DB publishes this data under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Credit: Deutsche Bahn AG.
+
+---
+
 ## Repo layout
 
 ```
@@ -203,7 +271,9 @@ packages/
 │   ├── src/
 │   │   ├── server.ts        wiring + cache integration
 │   │   ├── tools/           one file per MCP tool
-│   │   ├── clients/         Transitous (trains) + DWD (weather)
+│   │   ├── clients/         Transitous (trains), DWD (weather), DB Timetables (notices)
+│   │   ├── db/              DB message codes and key handling
+│   │   ├── setup-db-api.ts  terminal commands to save, check and remove the DB key
 │   │   ├── render.ts        plain-text route and late-train diagrams
 │   │   ├── map-link.ts      links to the live map page
 │   │   ├── cache.ts         LRU
@@ -223,7 +293,7 @@ docs/index.html              the live map page (GitHub Pages)
 npm test
 ```
 
-Tests cover the cache, both data clients, the tools, and server wiring. Network calls are mocked via [msw](https://mswjs.io), using trimmed real responses as fixtures; failure modes (timeout, 5xx, malformed bodies) are part of the test surface.
+Tests cover the cache, the data clients, key handling, the tools, and server wiring. Network calls are mocked via [msw](https://mswjs.io), using trimmed real responses as fixtures; failure modes (timeout, 5xx, malformed bodies) are part of the test surface.
 
 To check the real services are still reachable and shaped as expected:
 
@@ -237,6 +307,7 @@ npm run smoke -w db-mcp
 
 - [Transitous](https://transitous.org) — the open, community-run transit API (built on [MOTIS](https://github.com/motis-project/motis)) that provides all train data. Please use it considerately.
 - [OpenFreeMap](https://openfreemap.org) and [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors — the basemap of the live map, drawn with [MapLibre](https://maplibre.org).
+- [Deutsche Bahn AG](https://developers.deutschebahn.com) — the optional notices come from DB's Timetables API (CC BY 4.0). The message code list follows DB's own and was cross-checked against [Travel-Status-DE-IRIS](https://github.com/derf/Travel-Status-DE-IRIS) by Birte Kristina Friesel.
 - [DWD (Deutscher Wetterdienst)](https://www.dwd.de) — Germany's official weather service, source of the weather warnings.
 
 ## License

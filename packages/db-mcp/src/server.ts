@@ -9,11 +9,13 @@ import { ZodError } from "zod";
 
 import { TransitousClient } from "./clients/transitous.js";
 import { WeatherClient } from "./clients/weather.js";
+import { DbTimetablesClient } from "./clients/db-timetables.js";
+import { loadDbCredentials } from "./db/credentials.js";
 import { createCache } from "./cache.js";
 import { makeResolveStationTool } from "./tools/resolve_station.js";
 import { makeGetDeparturesTool } from "./tools/get_departures.js";
 import { makeFindTrainTool } from "./tools/find_train.js";
-import { makeGetTrainStatusTool } from "./tools/get_train_status.js";
+import { makeGetTrainStatusTool, type NoticeSource } from "./tools/get_train_status.js";
 import { makePlanJourneyTool } from "./tools/plan_journey.js";
 import { makeGetLateTrainsTool } from "./tools/get_late_trains.js";
 import { makeGetWeatherRiskTool } from "./tools/get_weather_risk.js";
@@ -35,7 +37,8 @@ export type TrainData = Pick<
 export type WeatherData = Pick<WeatherClient, "getWarningsNear">;
 
 export interface CreateServerOptions {
-  providers?: { trains: TrainData; weather: WeatherData };
+  /** `notices` is optional: present only when a DB API key is configured. */
+  providers?: { trains: TrainData; weather: WeatherData; notices?: NoticeSource };
 }
 
 export interface ServerHandle {
@@ -51,13 +54,13 @@ const TRAIN_CACHE_TTL_MS = 60 * 1000;
 const SLOW_CACHE_TTL_MS = 5 * 60 * 1000;
 
 export function createServer(opts: CreateServerOptions = {}): ServerHandle {
-  const { trains, weather } = opts.providers ?? buildDefaultProviders();
+  const { trains, weather, notices } = opts.providers ?? buildDefaultProviders();
 
   const tools = [
     makeResolveStationTool(trains),
     makeGetDeparturesTool(trains),
     makeFindTrainTool(trains),
-    makeGetTrainStatusTool(trains),
+    makeGetTrainStatusTool(trains, notices),
     makePlanJourneyTool(trains),
     makeGetLateTrainsTool(trains),
     makeGetWeatherRiskTool(weather),
@@ -93,7 +96,7 @@ export function createServer(opts: CreateServerOptions = {}): ServerHandle {
   return { server, listTools, callTool };
 }
 
-function buildDefaultProviders(): { trains: TrainData; weather: WeatherData } {
+function buildDefaultProviders(): { trains: TrainData; weather: WeatherData; notices?: NoticeSource } {
   const client = new TransitousClient();
   const weatherClient = new WeatherClient();
   const live = createCache<object>({ max: 500, ttlMs: TRAIN_CACHE_TTL_MS });
@@ -109,7 +112,12 @@ function buildDefaultProviders(): { trains: TrainData; weather: WeatherData } {
       cache.getOrCompute(`${label}:${JSON.stringify(args)}`, () => fn(...args)) as Promise<R>;
   };
 
+  // Optional DB notices: only with a DB API key (see README, "Using the DB API").
+  const creds = loadDbCredentials();
+  const notices = creds ? new DbTimetablesClient({ clientId: creds.clientId, apiKey: creds.apiKey }) : undefined;
+
   return {
+    notices,
     trains: {
       searchStations: cached(slow, "searchStations", client.searchStations.bind(client)),
       getDepartures: cached(live, "getDepartures", client.getDepartures.bind(client)),

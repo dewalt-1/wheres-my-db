@@ -1,0 +1,23 @@
+<timetable station="Hamm(Westf)Hbf" eva="8000149">
+<s id="-3020021515826539939-2611152048-16" eva="8000149">
+    <ar ct="2611152322" l="RE6"/>
+    <dp ct="2611152323" l="RE6"/>
+</s>
+<s id="1251412283829856747-2611152051-27" eva="8000149">
+    <ar cpth="Aachen Hbf|Köln Hbf|Köln Messe/Deutz|Köln-Mülheim|Leverkusen Mitte|Düsseldorf-Benrath|Düsseldorf Hbf|Düsseldorf Flughafen|Duisburg Hbf|Mülheim(Ruhr)Hbf|Essen Hbf|Wattenscheid|Bochum Hbf|Dortmund Hbf|Dortmund-Scharnhorst|Dortmund-Kurl|Kamen-Methler|Kamen|Bönen-Nordbögge" ppth="Aachen Hbf|Aachen-Rothe Erde|Stolberg(Rheinl)Hbf|Eschweiler Hbf|Langerwehe|Düren|Horrem|Köln-Ehrenfeld|Köln Hbf|Köln Messe/Deutz|Köln-Mülheim|Leverkusen Mitte|Düsseldorf-Benrath|Düsseldorf Hbf|Düsseldorf Flughafen|Duisburg Hbf|Mülheim(Ruhr)Hbf|Essen Hbf|Wattenscheid|Bochum Hbf|Dortmund Hbf|Dortmund-Scharnhorst|Dortmund-Kurl|Kamen-Methler|Kamen|Bönen-Nordbögge" pp="8" ct="2611160022" pt="2611152340" l="RE1" fb="RE1">
+        <m id="--6421558921207930395" t="d" c="43" ts="2611152153" ts-tts="26-11-15 21:53:48.046"/>
+    </ar>
+    <tl t="p" o="NXRE" c="NX" n="26837"/>
+</s>
+<s id="-2949724243121316784-2611152210-7" eva="8000149">
+    <m id="21c72196-c97b-4684-96f1-921fbd57d1e1" t="h" from="2606241021" to="2611182359" cat="BAUARBEITEN" ts="2611150230" ts-tts="26-11-15 02:30:01.506" pr="3"/>
+    <ar ct="2611152304" l="RB89">
+        <m id="--9003353556251517822" t="d" c="32" ts="2611152130" ts-tts="26-11-15 21:30:02.707"/>
+        <m id="-8291196522611677242" t="d" c="48" ts="2611152238" ts-tts="26-11-15 22:38:11.223"/>
+    </ar>
+    <dp ct="2611152309" l="RB89">
+        <m id="--9003353556251517822" t="d" c="32" ts="2611152130" ts-tts="26-11-15 21:30:02.707"/>
+        <m id="-8291196522611677242" t="d" c="48" ts="2611152238" ts-tts="26-11-15 22:38:11.223"/>
+    </dp>
+</s>
+</timetable>

@@ -4,7 +4,7 @@
 export class ProviderError extends Error {
   constructor(
     message: string,
-    public readonly source: "transitous" | "dwd",
+    public readonly source: "transitous" | "dwd" | "db",
     public readonly kind: "timeout" | "http" | "parse" | "not_found",
     cause?: unknown,
   ) {
