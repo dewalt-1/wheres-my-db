@@ -198,13 +198,12 @@ The server is a stdio MCP — it speaks JSON-RPC over stdin/stdout per the [Mode
 
 ## Using the DB API (optional)
 
-Everything above works without any account. If you add a free key for Deutsche Bahn's own timetable API, answers about your train also show the notices DB has posted for it at your stop, the small things that add up:
+Everything above works without any account. If you add a free key for Deutsche Bahn's own timetable API, answers about your train also show the notices DB has posted for it at your stop, the small things that add up. A real example from a train at Hamm:
 
 ```
 DB notices at Hamm (Westf), Hauptbahnhof:
- • Repair to a signal
- • Delay from its previous journey
- • No food or drink available
+ • Several coaches missing
+ • Construction work
 ```
 
 These include delay reasons, catering, missing or reordered coaches, seat reservations, bike spaces, accessibility and construction work. Without a key you simply don't get this list; nothing else changes.
