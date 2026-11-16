@@ -69,6 +69,8 @@ function train(over: Partial<TrainInArea>): TrainInArea {
     delayMinutes: 89,
     lat: 51,
     lon: 7,
+    fromLat: 51, fromLon: 7, toLat: 51.1, toLon: 7,
+    predictedDeparture: "2026-11-16T18:00:00Z", predictedArrival: "2026-11-16T18:10:00Z",
     progress: 0.5,
     delayGainedOnSegmentMinutes: 0,
     likelyStuck: false,

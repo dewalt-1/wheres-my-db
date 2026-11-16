@@ -78,6 +78,16 @@ Line numbers like "RB 10", "RE 5", "S 1" are reused across regions and operators
 
 Round to 5-minute buckets. "About 10–15 minutes" is honest; "12.4 minutes" is fake precision.
 
+### Signal 1b: the line ahead (the main added value)
+
+`get_train_status` returns `lineAhead`: the user's train checked against the other trains ahead of it on its route. Trains can't overtake between two stops, so if a train ahead is held or slow on a stretch the user's train still has to pass, the user's train will be later than the official prediction says. This works without any DB key.
+
+- `held-up`: lead your answer with it, in this shape: **"Officially 5 min late at Köln Hbf; RE 5 ahead is held near Bonn, so expect about 15–20 min late."** The diagram already contains this line. Use `estimatedDelayMinutes` as your verdict and say the official figure too, so the user sees what you added.
+  - `confidence: "possible"` means the train ahead may run on separate tracks (an S-Bahn ahead of a mainline train, or the reverse). Say "may be held up" rather than "will be".
+  - Never state it as certain. It assumes no recovery after the hold-up and standard gaps between trains.
+- `clear`: trains ahead were checked and none holds the train up. You can say so in a few words ("nothing ahead is holding it up"); it supports an on-time verdict.
+- `not-checked`: say nothing about it.
+
 ### Signal 2: the transfer window
 
 Compare the predicted arrival of the incoming train with the predicted departure of the connecting one, both from live data. `plan_journey` does this for you and lists `riskyTransfers` (under 5 minutes between trains). Allow extra time when the trains use different platforms or the option contains a walking leg.
@@ -180,6 +190,15 @@ Every prediction includes:
 3. **Caveat** when relevant: what could change it.
 
 Example:
+
+> **Likely 15–20 minutes late into Köln (officially 5).**
+>
+> - RE 5 is held just ahead of your train near Bonn, and trains can't overtake there, so yours can't arrive before it clears.
+> - Your train itself has been on time so far.
+>
+> _If the RE 5 gets moving soon, this shrinks; the official figure doesn't yet account for it._
+
+Another example:
 
 > **Likely 35–40 minutes late into Köln.**
 >

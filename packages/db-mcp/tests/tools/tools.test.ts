@@ -34,7 +34,11 @@ describe("pass-through tools", () => {
     const getTrainStatus = vi.fn().mockResolvedValue(status);
     const res = await makeGetTrainStatusTool({ getTrainStatus }).handler({ tripId: "t" });
     expect(getTrainStatus).toHaveBeenCalledWith("t");
-    expect(res.data).toEqual({ ...status, boardingNotices: { status: "off" } });
+    expect(res.data).toEqual({
+      ...status,
+      boardingNotices: { status: "off" },
+      lineAhead: { status: "not-checked", reason: "Area data unavailable" },
+    });
     expect(res.diagram).toContain("ICE 1 → Berlin");
     expect(res.mapUrl).toBe("https://dewalt-1.github.io/wheres-my-db/?trip=t");
   });
@@ -106,6 +110,52 @@ describe("pass-through tools", () => {
       const getNoticesForTrain = vi.fn().mockResolvedValue(null);
       const res = await makeGetTrainStatusTool({ getTrainStatus }, { getNoticesForTrain }).handler(at);
       expect(res.data.boardingNotices).toEqual({ status: "station-not-found", station: "Köln Hbf" });
+    });
+  });
+
+  describe("get_train_status line ahead (no DB key needed)", () => {
+    const T0 = Date.now();
+    const at = (min: number) => new Date(T0 + min * 60_000).toISOString();
+    const s = (name: string, lat: number, arr?: number, dep?: number) => ({
+      stationName: name, stationId: name, lat, lon: 7, cancelled: false, alerts: [],
+      predictedArrival: arr === undefined ? undefined : at(arr), predictedDeparture: dep === undefined ? undefined : at(dep),
+      arrivalDelayMinutes: arr === undefined ? undefined : 5,
+    });
+    const status = {
+      tripId: "yours", name: "RE 1", headsign: "D", mode: "REGIONAL_RAIL", realTime: true, cancelled: false, alerts: [],
+      stopovers: [s("A", 50.0, undefined, -2), s("B", 50.1, 8, 9), s("C", 50.2, 18, 19), s("D", 50.3, 28)],
+    };
+    const blocker = {
+      tripId: "other", trainName: "RE 5", mode: "REGIONAL_RAIL", fromStation: "B", toStation: "C",
+      fromLat: 50.1, fromLon: 7, toLat: 50.2, toLon: 7, predictedDeparture: at(-5), predictedArrival: at(30),
+      delayMinutes: 20, lat: 50.12, lon: 7, progress: 0.2, delayGainedOnSegmentMinutes: 15, likelyStuck: true, realTime: true,
+    };
+
+    it("asks for the trains around the stretch ahead and reports the hold-up in data and diagram", async () => {
+      const getTrainsInArea = vi.fn().mockResolvedValue([blocker]);
+      const tool = makeGetTrainStatusTool({ getTrainStatus: vi.fn().mockResolvedValue(status), getTrainsInArea });
+      const res = await tool.handler({ tripId: "yours", boardLat: 50.3, boardLon: 7 });
+      const box = getTrainsInArea.mock.calls[0][0];
+      expect(box.minLat).toBeLessThan(50.0);
+      expect(box.maxLat).toBeGreaterThan(50.3);
+      expect(res.data.lineAhead).toMatchObject({ status: "held-up", atStation: "D", estimatedDelayMinutes: { low: 20, high: 25 } });
+      expect(res.diagram).toContain("Officially 5 min late at D; RE 5 ahead is held near B, so expect about 20–25 min late.");
+    });
+
+    it("keeps the train answer when the area lookup fails", async () => {
+      const getTrainsInArea = vi.fn().mockRejectedValue(new ProviderError("transitous map/trips timed out", "transitous", "timeout"));
+      const tool = makeGetTrainStatusTool({ getTrainStatus: vi.fn().mockResolvedValue(status), getTrainsInArea });
+      const res = await tool.handler({ tripId: "yours", boardLat: 50.3, boardLon: 7 });
+      expect(res.data.lineAhead).toEqual({ status: "not-checked", reason: "transitous map/trips timed out" });
+      expect(res.data.name).toBe("RE 1");
+    });
+
+    it("does not guess for trains without live data", async () => {
+      const getTrainsInArea = vi.fn();
+      const tool = makeGetTrainStatusTool({ getTrainStatus: vi.fn().mockResolvedValue({ ...status, realTime: false }), getTrainsInArea });
+      const res = await tool.handler({ tripId: "yours", boardLat: 50.3, boardLon: 7 });
+      expect(res.data.lineAhead).toEqual({ status: "not-checked", reason: "No live data for this train" });
+      expect(getTrainsInArea).not.toHaveBeenCalled();
     });
   });
 
@@ -191,6 +241,8 @@ function train(name: string, delayMinutes: number): TrainInArea {
     delayMinutes,
     lat: 51,
     lon: 7,
+    fromLat: 51, fromLon: 7, toLat: 51.1, toLon: 7,
+    predictedDeparture: "2026-11-16T18:00:00Z", predictedArrival: "2026-11-16T18:10:00Z",
     progress: 0.5,
     delayGainedOnSegmentMinutes: 0,
     likelyStuck: false,

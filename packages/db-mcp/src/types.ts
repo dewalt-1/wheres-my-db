@@ -105,6 +105,14 @@ export interface TrainInArea {
   mode: string;
   fromStation: string;
   toStation: string;
+  /** Coordinates of the stop it last left and the one it is heading to. */
+  fromLat: number;
+  fromLon: number;
+  toLat: number;
+  toLon: number;
+  /** Predicted departure from the last stop and arrival at the next (ISO 8601). */
+  predictedDeparture: string;
+  predictedArrival: string;
   /** Predicted delay at the next stop, in minutes. */
   delayMinutes: number;
   /** Estimated current position, interpolated between the two stops. */
@@ -121,6 +129,38 @@ export interface TrainInArea {
    */
   likelyStuck: boolean;
   realTime: boolean;
+}
+
+/**
+ * The user's train checked against other trains ahead of it on its route.
+ * status "held-up": a train ahead cannot clear a stretch your train still
+ * has to pass in time, so your train will likely be later than the official
+ * prediction. status "clear": trains ahead were checked and none holds it
+ * up. status "not-checked": see `reason`.
+ */
+export interface LineAhead {
+  status: "held-up" | "clear" | "not-checked";
+  reason?: string;
+  /** The stop the estimate is for: where the user boards, else the next stop. */
+  atStation?: string;
+  officialDelayMinutes?: number;
+  /** Estimated delay at atStation, as a 5-minute range. */
+  estimatedDelayMinutes?: { low: number; high: number };
+  /** The train ahead that holds yours up. */
+  cause?: {
+    trainName: string;
+    mode: string;
+    fromStation: string;
+    toStation: string;
+    /** The station it is closest to now. */
+    nearStation: string;
+    delayMinutes: number;
+    likelyStuck: boolean;
+  };
+  /** likely: both trains use the same kind of tracks. possible: they may run on separate tracks. */
+  confidence?: "likely" | "possible";
+  /** Trains found ahead on the same stretch and direction. */
+  trainsAhead?: number;
 }
 
 /** A notice DB has attached to a train at a station. */
