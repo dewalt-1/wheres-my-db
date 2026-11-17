@@ -37,10 +37,15 @@ export const RAIL_MODES = [
 ] as const;
 const RAIL_MODE_SET: ReadonlySet<string> = new Set(RAIL_MODES);
 
+const LONG_DISTANCE_MODES = ["HIGHSPEED_RAIL", "LONG_DISTANCE", "NIGHT_RAIL"] as const;
+/** Train names that only ever run as long-distance trains. */
+const LONG_DISTANCE_NAME = /^(ICE|ECE|EC|IC|EN|NJ|RJX|RJ|TGV|FLX|THA|EST|ES)\s*\d/i;
+
 /** A train losing at least this much time between two stops is flagged likelyStuck. */
+const STUCK_MIN_GAIN_MINUTES = 10;
+/** A segment scheduled longer than this skips stops. */
 const MAX_STOP_TO_STOP_MINUTES = 60;
 const FEEDS_DISAGREE_MINUTES = 10;
-const STUCK_MIN_GAIN_MINUTES = 10;
 
 export interface TransitousClientOptions {
   baseUrl?: string;
@@ -279,16 +284,18 @@ export class TransitousClient {
    */
   async getDepartures(
     stationId: string,
-    opts: { time?: string; limit?: number } = {},
+    opts: { time?: string; limit?: number; windowSeconds?: number; modes?: readonly string[] } = {},
   ): Promise<Departure[]> {
     const params: Record<string, string> = {
       stopId: stationId,
       n: String(opts.limit ?? 30),
       // Merge platforms/duplicate stop entries of the same station.
       radius: "200",
-      mode: RAIL_MODES.join(","),
+      mode: (opts.modes ?? RAIL_MODES).join(","),
     };
     if (opts.time) params.time = opts.time;
+    // With a window the board covers that whole span, however many entries it takes.
+    if (opts.windowSeconds) params.window = String(opts.windowSeconds);
     const raw = await this.get("/api/v5/stoptimes", params);
     const list = (raw as { stopTimes?: RawStopTime[] })?.stopTimes;
     if (!Array.isArray(list)) {
@@ -334,7 +341,19 @@ export class TransitousClient {
     if (!wanted) {
       throw new ProviderError("empty train name", "transitous", "not_found");
     }
-    const board = await this.getDepartures(stationId, { time, limit: 120 });
+    // The board is sorted by actual departure, so a late train sits far down
+    // it. Search a time window rather than a number of entries, starting
+    // before the requested time in case the user is on board already.
+    // Long-distance names: only long-distance trains, 3 h either side.
+    // Others (S-Bahn, tram lines run often): all rail, 1 h before to 2 h after.
+    const longDistance = LONG_DISTANCE_NAME.test(trainName.trim());
+    const hoursBefore = longDistance ? 3 : 1;
+    const from = new Date(Date.parse(time ?? new Date().toISOString()) - hoursBefore * 3600_000);
+    const board = await this.getDepartures(stationId, {
+      time: from.toISOString(),
+      windowSeconds: (longDistance ? 6 : 3) * 3600,
+      modes: longDistance ? LONG_DISTANCE_MODES : RAIL_MODES,
+    });
     const matches = board.filter((d) => {
       const name = normaliseName(d.trainName);
       // "RE1 (26814)" should match both "RE1" and "RE1 (26814)".

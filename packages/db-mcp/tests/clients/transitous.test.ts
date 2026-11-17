@@ -121,6 +121,24 @@ describe("TransitousClient.findTrain", () => {
     });
   });
 
+  it("searches a window wide enough to reach a train that is hours late", async () => {
+    // The board is sorted by actual departure. With a fixed number of entries,
+    // a train running 30+ min late fell past the end and only its
+    // timetable-only twin was found. Ask for a time window instead.
+    let query: URLSearchParams | undefined;
+    mswServer.use(
+      http.get(`${BASE}/api/v5/stoptimes`, ({ request }) => {
+        query = new URL(request.url).searchParams;
+        return HttpResponse.json(ice224Board);
+      }),
+    );
+    await new TransitousClient().findTrain("ICE 224", KOELN, "2026-11-17T18:00:00Z");
+    expect(query?.get("time")).toBe("2026-11-17T15:00:00.000Z"); // 3 h before: the user may be on board already
+    expect(query?.get("window")).toBe(String(6 * 3600));
+    // A long-distance name only needs long-distance trains, which keeps the board small.
+    expect(query?.get("mode")).toBe("HIGHSPEED_RAIL,LONG_DISTANCE,NIGHT_RAIL");
+  });
+
   it("does not match a different category with the same number", async () => {
     useBoard();
     await expect(new TransitousClient().findTrain("RB 107", KOELN)).rejects.toSatisfy(
