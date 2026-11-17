@@ -187,6 +187,22 @@ function mapStation(place: RawPlace | undefined): Station {
   };
 }
 
+/**
+ * Cross-border trains come from several feeds at once (ICE 224 is in both the
+ * German and the Dutch feed). Keep one record per run, the same train at the
+ * same scheduled time, preferring the one with live data: the other is often
+ * timetable only and would say "on time" whatever is happening.
+ */
+function onePerRun(departures: Departure[]): Departure[] {
+  const best = new Map<string, Departure>();
+  for (const d of departures) {
+    const key = `${normaliseName(d.trainName.replace(/\(.*\)/, ""))}@${d.scheduledDeparture}`;
+    const kept = best.get(key);
+    if (!kept || (d.realTime && !kept.realTime)) best.set(key, d);
+  }
+  return departures.filter((d) => [...best.values()].includes(d));
+}
+
 function mapStopover(place: RawPlace): Stopover {
   const scheduledArrival = str(place.scheduledArrival);
   const predictedArrival = str(place.arrival);
@@ -290,7 +306,7 @@ export class TransitousClient {
         realTime: st.realTime === true,
       });
     }
-    return departures;
+    return onePerRun(departures);
   }
 
   /**
@@ -391,6 +407,7 @@ export class TransitousClient {
       throw new ProviderError("map/trips did not return a list", "transitous", "parse");
     }
     const byTrip = new Map<string, TrainInArea>();
+    const runKey = new Map<string, string>();
     for (const seg of raw as RawMapSegment[]) {
       const mode = str(seg.mode) ?? "";
       if (!RAIL_MODE_SET.has(mode)) continue;
@@ -444,9 +461,19 @@ export class TransitousClient {
       // A trip can appear on several segments; keep the one in progress now.
       const existing = byTrip.get(tripId);
       const inProgress = now >= depMs && now <= arrMs;
-      if (!existing || inProgress) byTrip.set(tripId, train);
+      if (!existing || inProgress) {
+        byTrip.set(tripId, train);
+        runKey.set(tripId, `${normaliseName(train.trainName)}@${str(seg.scheduledDeparture) ?? dep}`);
+      }
     }
-    return [...byTrip.values()];
+    // The same run from two feeds (see onePerRun): keep the live one.
+    const best = new Map<string, TrainInArea>();
+    for (const [tripId, train] of byTrip) {
+      const key = runKey.get(tripId) ?? tripId;
+      const kept = best.get(key);
+      if (!kept || (train.realTime && !kept.realTime)) best.set(key, train);
+    }
+    return [...best.values()];
   }
 
   private mapJourneyLeg(leg: RawLeg): JourneyLeg {

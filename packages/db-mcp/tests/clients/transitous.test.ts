@@ -5,6 +5,7 @@ import { TransitousClient } from "../../src/clients/transitous.js";
 import { ProviderError } from "../../src/errors.js";
 import geocodeFixture from "../fixtures/transitous-geocode.json" with { type: "json" };
 import stoptimesFixture from "../fixtures/transitous-stoptimes.json" with { type: "json" };
+import ice224Board from "../fixtures/transitous-stoptimes-ice224.json" with { type: "json" };
 import tripFixture from "../fixtures/transitous-trip.json" with { type: "json" };
 import planFixture from "../fixtures/transitous-plan.json" with { type: "json" };
 import mapFixture from "../fixtures/transitous-map-trips.json" with { type: "json" };
@@ -102,6 +103,22 @@ describe("TransitousClient.findTrain", () => {
     useBoard();
     const matches = await new TransitousClient().findTrain("RE1", KOELN);
     expect(matches.map((m) => m.trainName)).toEqual(["RE1 (26814)"]);
+  });
+
+  it("returns one record per run, the one with live data, when feeds duplicate a train", async () => {
+    // Recorded board: a cross-border ICE listed by two feeds, the
+    // timetable-only record first and the live one second.
+    mswServer.use(
+      http.get(`${BASE}/api/v5/stoptimes`, () => HttpResponse.json(ice224Board)),
+    );
+    const matches = await new TransitousClient().findTrain("ICE 224", KOELN);
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toMatchObject({
+      tripId: "20261117_14:20_nl-OpenOV_364523750",
+      realTime: true,
+      cancelled: true,
+      delayMinutes: 31,
+    });
   });
 
   it("does not match a different category with the same number", async () => {
