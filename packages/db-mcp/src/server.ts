@@ -86,7 +86,11 @@ export function createServer(opts: CreateServerOptions = {}): ServerHandle {
 
   const server = new Server(
     { name: "db-mcp", version: "0.2.0" },
-    { capabilities: { tools: {} } },
+    {
+      capabilities: { tools: {} },
+      // Sent to every MCP client on connect, so agents without the skill see it too.
+      instructions: SERVER_INSTRUCTIONS,
+    },
   );
   server.setRequestHandler(ListToolsRequestSchema, listTools);
   server.setRequestHandler(CallToolRequestSchema, async (req) =>
@@ -95,6 +99,14 @@ export function createServer(opts: CreateServerOptions = {}): ServerHandle {
 
   return { server, listTools, callTool };
 }
+
+const SERVER_INSTRUCTIONS = [
+  "Live German train data: delays, positions, the trains ahead of the user's train, DB notices, weather warnings.",
+  "get_train_status and get_late_trains return a second text block: a metro-style text diagram (● ○ ▼ ▶ and lines) followed by a Live map link.",
+  "Always include that diagram in your reply, unchanged, inside a code block so the columns line up, even when your answer is short. Do not redraw, summarise or drop it.",
+  "For get_late_trains give the Live map link straight away. For get_train_status answer first, then ask if the user wants a live view, and give the link only if they say yes.",
+  "Where a train is flagged 'feeds disagree', two data sources give different delays or positions: say so rather than stating either as fact.",
+].join(" ");
 
 function buildDefaultProviders(): { trains: TrainData; weather: WeatherData; notices?: NoticeSource } {
   const client = new TransitousClient();

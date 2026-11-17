@@ -38,6 +38,8 @@ export const RAIL_MODES = [
 const RAIL_MODE_SET: ReadonlySet<string> = new Set(RAIL_MODES);
 
 /** A train losing at least this much time between two stops is flagged likelyStuck. */
+const MAX_STOP_TO_STOP_MINUTES = 60;
+const FEEDS_DISAGREE_MINUTES = 10;
 const STUCK_MIN_GAIN_MINUTES = 10;
 
 export interface TransitousClientOptions {
@@ -185,6 +187,15 @@ function mapStation(place: RawPlace | undefined): Station {
     lat: num(place?.lat) ?? 0,
     lon: num(place?.lon) ?? 0,
   };
+}
+
+/**
+ * Trip ids look like "20261117_16:38_nl-OpenOV_394269312": service day and
+ * start time first, then the feed. The same run from two feeds shares that
+ * start, wherever each feed currently places the train.
+ */
+function runStart(tripId: string): string | undefined {
+  return /^\d{8}_\d{2}:\d{2}/.exec(tripId)?.[0];
 }
 
 /**
@@ -408,6 +419,7 @@ export class TransitousClient {
     }
     const byTrip = new Map<string, TrainInArea>();
     const runKey = new Map<string, string>();
+    const scheduledSpan = new Map<string, number>();
     for (const seg of raw as RawMapSegment[]) {
       const mode = str(seg.mode) ?? "";
       if (!RAIL_MODE_SET.has(mode)) continue;
@@ -438,6 +450,11 @@ export class TransitousClient {
       const departureDelay = delayMinutes(str(seg.scheduledDeparture), dep) ?? 0;
       const delay = delayMinutes(str(seg.scheduledArrival), arr) ?? departureDelay;
       const gained = delay - departureDelay;
+      // A segment scheduled at over an hour skips stops (cancelled ones, as in
+      // a diversion). Time lost there is the detour, not a train standing still.
+      const scheduledMinutes =
+        (Date.parse(str(seg.scheduledArrival) ?? arr) - Date.parse(str(seg.scheduledDeparture) ?? dep)) / 60_000;
+      const skipsStops = scheduledMinutes > MAX_STOP_TO_STOP_MINUTES;
       const train: TrainInArea = {
         tripId,
         trainName: str(seg.trips?.[0]?.displayName) ?? mode,
@@ -455,7 +472,7 @@ export class TransitousClient {
         lon: fromLon + (toLon - fromLon) * progress,
         progress,
         delayGainedOnSegmentMinutes: gained,
-        likelyStuck: gained >= STUCK_MIN_GAIN_MINUTES,
+        likelyStuck: gained >= STUCK_MIN_GAIN_MINUTES && !skipsStops,
         realTime: seg.realTime === true,
       };
       // A trip can appear on several segments; keep the one in progress now.
@@ -463,17 +480,34 @@ export class TransitousClient {
       const inProgress = now >= depMs && now <= arrMs;
       if (!existing || inProgress) {
         byTrip.set(tripId, train);
-        runKey.set(tripId, `${normaliseName(train.trainName)}@${str(seg.scheduledDeparture) ?? dep}`);
+        runKey.set(tripId, `${normaliseName(train.trainName)}@${runStart(tripId) ?? str(seg.scheduledDeparture) ?? dep}`);
+        scheduledSpan.set(tripId, scheduledMinutes);
       }
     }
-    // The same run from two feeds (see onePerRun): keep the live one.
-    const best = new Map<string, TrainInArea>();
-    for (const [tripId, train] of byTrip) {
-      const key = runKey.get(tripId) ?? tripId;
+    // The same run from two feeds (see onePerRun). Keep the live one; if both
+    // are live, the one on an ordinary stop-to-stop segment, and say whether
+    // the feeds disagree so nobody states either as fact.
+    const best = new Map<string, { id: string; train: TrainInArea }>();
+    for (const [id, train] of byTrip) {
+      const key = runKey.get(id) ?? id;
       const kept = best.get(key);
-      if (!kept || (train.realTime && !kept.realTime)) best.set(key, train);
+      if (!kept) {
+        best.set(key, { id, train });
+        continue;
+      }
+      const disagree =
+        kept.train.realTime && train.realTime &&
+        (Math.abs(kept.train.delayMinutes - train.delayMinutes) >= FEEDS_DISAGREE_MINUTES ||
+          kept.train.fromStation !== train.fromStation);
+      const better =
+        (train.realTime && !kept.train.realTime) ||
+        (train.realTime === kept.train.realTime &&
+          (scheduledSpan.get(id) ?? 0) < (scheduledSpan.get(kept.id) ?? 0));
+      const winner = better ? { id, train } : kept;
+      if (disagree) winner.train.feedsDisagree = true;
+      best.set(key, winner);
     }
-    return [...best.values()];
+    return [...best.values()].map((b) => b.train);
   }
 
   private mapJourneyLeg(leg: RawLeg): JourneyLeg {

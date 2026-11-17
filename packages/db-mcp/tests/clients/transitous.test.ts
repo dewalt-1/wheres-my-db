@@ -250,6 +250,52 @@ describe("TransitousClient.getTrainsInArea", () => {
       likelyStuck: true,
     });
   });
+
+  // One ICE run as two feeds report it. The Dutch feed puts it between
+  // Siegburg and Frankfurt Airport, +53. The German feed has its stops from
+  // Arnhem to Düsseldorf cancelled (a diversion), so its current segment runs
+  // straight from Utrecht to Köln, scheduled at two hours, now +164.
+  const segment = (o: {
+    tripId: string; from: [string, number, number]; to: [string, number, number];
+    scheduledDeparture: string; departure: string; scheduledArrival: string; arrival: string;
+  }) => ({
+    ...structuredClone(mapFixture[2]),
+    trips: [{ tripId: o.tripId, displayName: "ICE 129" }],
+    mode: "HIGHSPEED_RAIL",
+    realTime: true,
+    from: { name: o.from[0], lat: o.from[1], lon: o.from[2] },
+    to: { name: o.to[0], lat: o.to[1], lon: o.to[2] },
+    scheduledDeparture: o.scheduledDeparture, departure: o.departure,
+    scheduledArrival: o.scheduledArrival, arrival: o.arrival,
+  });
+  const dutchFeed = segment({
+    tripId: "20261117_16:38_nl-OpenOV_394269312",
+    from: ["Siegburg/Bonn", 50.79, 7.2], to: ["Frankfurt Flughafen Fernb", 50.05, 8.57],
+    scheduledDeparture: "2026-11-17T18:36:00Z", departure: "2026-11-17T19:29:00Z",
+    scheduledArrival: "2026-11-17T19:13:00Z", arrival: "2026-11-17T20:06:00Z",
+  });
+  const germanFeedDiverted = segment({
+    tripId: "20261117_16:38_de-DELFI_3485829888",
+    from: ["Utrecht Centraal", 52.09, 5.11], to: ["Köln Hbf", 50.94, 6.96],
+    scheduledDeparture: "2026-11-17T16:04:00Z", departure: "2026-11-17T16:10:00Z",
+    scheduledArrival: "2026-11-17T18:11:00Z", arrival: "2026-11-17T20:55:00Z",
+  });
+
+  it("keeps one entry per run when two feeds place the same train on different segments", async () => {
+    mswServer.use(
+      http.get(`${BASE}/api/v5/map/trips`, () => HttpResponse.json([germanFeedDiverted, dutchFeed])),
+    );
+    const trains = await new TransitousClient().getTrainsInArea(box);
+    expect(trains).toHaveLength(1);
+    // The feed with an ordinary stop-to-stop segment wins; the disagreement is flagged.
+    expect(trains[0]).toMatchObject({ fromStation: "Siegburg/Bonn", delayMinutes: 53, feedsDisagree: true });
+  });
+
+  it("does not call a train stuck on a segment that skips cancelled stops", async () => {
+    mswServer.use(http.get(`${BASE}/api/v5/map/trips`, () => HttpResponse.json([germanFeedDiverted])));
+    const [train] = await new TransitousClient().getTrainsInArea(box);
+    expect(train).toMatchObject({ delayMinutes: 164, likelyStuck: false });
+  });
 });
 
 describe("TransitousClient transport errors", () => {
