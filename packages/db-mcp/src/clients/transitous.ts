@@ -162,6 +162,17 @@ function trainNameOf(raw: {
   );
 }
 
+/**
+ * Run number without category or leading zeros: "ICE 107" → "107",
+ * "026814" → "26814", "RE1 (26814)" → "26814".
+ */
+function trainNumberOf(raw: { tripShortName?: unknown; displayName?: unknown }): string | undefined {
+  const fromShort = str(raw.tripShortName)?.match(/(\d+)\s*$/)?.[1];
+  const fromDisplay = str(raw.displayName)?.match(/\((\d+)\)|(\d+)\s*$/);
+  const digits = fromShort ?? fromDisplay?.[1] ?? fromDisplay?.[2];
+  return digits ? digits.replace(/^0+(?=\d)/, "") : undefined;
+}
+
 /** "ICE 107", "ice107" and "Ice  107" all normalise to "ICE107". */
 function normaliseName(name: string): string {
   return name.toUpperCase().replace(/\s+/g, "");
@@ -324,6 +335,7 @@ export class TransitousClient {
     return {
       tripId: str(leg.tripId) ?? tripId,
       name: trainNameOf(leg),
+      trainNumber: trainNumberOf(leg),
       headsign: str(leg.headsign) ?? "",
       mode: str(leg.mode) ?? "",
       realTime: leg.realTime === true,

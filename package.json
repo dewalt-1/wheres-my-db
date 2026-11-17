@@ -3,11 +3,15 @@
   "private": true,
   "version": "0.1.0",
   "description": "Where's My DB? — a Claude skill + MCP server that catches Deutsche Bahn delays before the official board does.",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "setup-db-api": "npm run setup-db-api -w db-mcp",
+    "db-api-status": "npm run db-api-status -w db-mcp"
   },
   "engines": {
     "node": ">=20"

@@ -62,6 +62,8 @@ export interface TrainStatus {
   tripId: string;
   /** Human-facing name, e.g. "ICE 107". */
   name: string;
+  /** Run number without category or leading zeros, e.g. "107", "26814". */
+  trainNumber?: string;
   headsign: string;
   mode: string;
   /** False when the times are timetable-only (no live data for this trip). */
@@ -119,6 +121,33 @@ export interface TrainInArea {
    */
   likelyStuck: boolean;
   realTime: boolean;
+}
+
+/** A notice DB has attached to a train at a station. */
+export interface Notice {
+  /** delay-reason: why it is late. quality: catering, coaches, bikes, Wi-Fi, etc. disruption: a published disruption notice. */
+  kind: "delay-reason" | "quality" | "disruption";
+  /** Plain-English text. */
+  text: string;
+  /** DB message code, when there is one. */
+  code?: number;
+  /** When DB published it (ISO 8601), when known. */
+  since?: string;
+}
+
+/**
+ * DB notices for one train at one station.
+ * status "off": no DB API key is configured, so DB notices are not available.
+ * status "ok": looked up; `notices` may be empty, meaning DB published none.
+ * status "station-not-found": the station could not be matched in DB's data.
+ * status "not-covered": DB publishes notices for trains only, not trams, U-Bahn or buses.
+ * status "error": the DB API failed; `message` says why.
+ */
+export interface TrainNotices {
+  status: "off" | "ok" | "station-not-found" | "not-covered" | "error";
+  station?: string;
+  notices?: Notice[];
+  message?: string;
 }
 
 /** A weather warning from DWD (Deutscher Wetterdienst). */

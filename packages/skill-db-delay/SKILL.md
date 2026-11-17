@@ -88,6 +88,20 @@ You cannot see whether a connecting train will be held for late passengers. Neve
 
 Tell the user the current platform (`track`) at their stop. Do not claim a platform *change* from `scheduledTrack`: that field often holds an internal code, not the planned platform. `cancelled: true` on a stop or a whole trip ends the question; move straight to alternatives with `plan_journey`. If `alerts` is non-empty, quote the alert text; if it is empty, that only means no alert was published, not that nothing is wrong.
 
+### Signal 3b: DB notices at the user's stop
+
+When a DB API key is configured, `get_train_status` (called with `boardLat`/`boardLon`) returns `boardingNotices` for the user's boarding stop:
+
+- `delay-reason` notices say *why* a train is late ("Repair to a signal", "Delay from its previous journey"). Use them in your reasoning; quote the most recent one or two.
+- `quality` notices are the small things that affect the trip ("No food or drink available", "Several coaches missing", "Bikes not allowed", "Train very busy"). Mention them when they matter for this user, even if the train is on time.
+- `disruption` notices name a published disruption (e.g. construction work). Treat them like alerts: context, not a delay prediction.
+
+The diagram already lists them under "DB notices at …". Statuses other than `ok`:
+
+- `off`: no DB key is configured. Don't mention DB notices unless the user asks about delay reasons, catering or coaches; then say they can be added with a free DB API key (README, "Using the DB API"). Never ask the user to paste a key into the chat; point them to the terminal command `npm run setup-db-api`.
+- `not-covered`: trams, U-Bahn and buses; DB publishes no notices for them. Say nothing about it.
+- `station-not-found` or `error`: say DB's notices couldn't be loaded this time, in one short clause, and carry on.
+
 ### Signal 4: what's happening around the train
 
 When one train is badly delayed, `get_late_trains` around its current area shows whether it is alone or part of a wider problem. Many late trains on one corridor suggests a line disruption and makes recovery unlikely. `likelyStuck: true` means a train is losing 10+ minutes between two stops right now; describe it as "appears to be held or crawling", never as a confirmed standstill.

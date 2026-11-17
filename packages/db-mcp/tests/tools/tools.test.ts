@@ -34,7 +34,7 @@ describe("pass-through tools", () => {
     const getTrainStatus = vi.fn().mockResolvedValue(status);
     const res = await makeGetTrainStatusTool({ getTrainStatus }).handler({ tripId: "t" });
     expect(getTrainStatus).toHaveBeenCalledWith("t");
-    expect(res.data).toEqual(status);
+    expect(res.data).toEqual({ ...status, boardingNotices: { status: "off" } });
     expect(res.diagram).toContain("ICE 1 → Berlin");
     expect(res.mapUrl).toBe("https://dewalt-1.github.io/wheres-my-db/?trip=t");
   });
@@ -62,6 +62,51 @@ describe("pass-through tools", () => {
     const res = await tool.handler({ tripId: "t", boardLat: 52.52, boardLon: 13.37 });
     expect(res.mapUrl).toBe("https://dewalt-1.github.io/wheres-my-db/?trip=t");
     expect(res.diagram).not.toContain("you board here");
+  });
+
+  describe("get_train_status DB notices", () => {
+    const koeln = { stationName: "Köln Hbf", stationId: "k", lat: 50.943, lon: 6.9587, cancelled: false, alerts: [], scheduledDeparture: "2026-11-15T21:37:00Z" };
+    const status = { tripId: "t", name: "RE1 (26814)", trainNumber: "26814", headsign: "Aachen", mode: "REGIONAL_RAIL", realTime: true, cancelled: false, alerts: [], stopovers: [koeln] };
+    const getTrainStatus = vi.fn().mockResolvedValue(status);
+    const at = { tripId: "t", boardLat: 50.943, boardLon: 6.959 };
+
+    it("reports 'off' when no DB key is configured", async () => {
+      const res = await makeGetTrainStatusTool({ getTrainStatus }).handler(at);
+      expect(res.data.boardingNotices).toEqual({ status: "off" });
+      expect(res.diagram).not.toContain("DB notices");
+    });
+
+    it("asks DB for the boarding stop, train number and planned time, and shows the notices", async () => {
+      const getNoticesForTrain = vi.fn().mockResolvedValue({
+        station: "Köln Hbf",
+        notices: [{ kind: "delay-reason", text: "Repair to a signal", code: 34 }, { kind: "quality", text: "No food or drink available", code: 90 }],
+      });
+      const res = await makeGetTrainStatusTool({ getTrainStatus }, { getNoticesForTrain }).handler(at);
+      expect(getNoticesForTrain).toHaveBeenCalledWith("Köln Hbf", "26814", "2026-11-15T21:37:00Z");
+      expect(res.data.boardingNotices.status).toBe("ok");
+      expect(res.diagram).toContain("DB notices at Köln Hbf:\n • Repair to a signal\n • No food or drink available");
+    });
+
+    it("keeps working when DB fails, and says why", async () => {
+      const getNoticesForTrain = vi.fn().mockRejectedValue(new ProviderError("DB API timed out after 15000ms", "db", "timeout"));
+      const res = await makeGetTrainStatusTool({ getTrainStatus }, { getNoticesForTrain }).handler(at);
+      expect(res.data.boardingNotices).toEqual({ status: "error", station: "Köln Hbf", message: "DB API timed out after 15000ms" });
+      expect(res.data.name).toBe("RE1 (26814)");
+    });
+
+    it("does not ask DB about trams or U-Bahn", async () => {
+      const getNoticesForTrain = vi.fn();
+      const tram = vi.fn().mockResolvedValue({ ...status, name: "16", mode: "TRAM" });
+      const res = await makeGetTrainStatusTool({ getTrainStatus: tram }, { getNoticesForTrain }).handler(at);
+      expect(res.data.boardingNotices).toEqual({ status: "not-covered" });
+      expect(getNoticesForTrain).not.toHaveBeenCalled();
+    });
+
+    it("reports a station DB could not match", async () => {
+      const getNoticesForTrain = vi.fn().mockResolvedValue(null);
+      const res = await makeGetTrainStatusTool({ getTrainStatus }, { getNoticesForTrain }).handler(at);
+      expect(res.data.boardingNotices).toEqual({ status: "station-not-found", station: "Köln Hbf" });
+    });
   });
 
   it("get_train_status needs both boarding coordinates or neither", () => {
