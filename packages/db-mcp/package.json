@@ -17,7 +17,8 @@
     "test:watch": "vitest",
     "smoke": "npm run build && node scripts/smoke.mjs",
     "setup-db-api": "npm run build && node dist/index.js setup-db-api",
-    "db-api-status": "npm run build && node dist/index.js db-api-status"
+    "db-api-status": "npm run build && node dist/index.js db-api-status",
+    "sweep": "npm run build && node scripts/line-ahead-sweep.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

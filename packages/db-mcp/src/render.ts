@@ -2,7 +2,8 @@
 // show: terminal agents, desktop apps and plain chat windows alike. Tools
 // attach these to their results so the agent can paste them verbatim.
 
-import type { TrainInArea, TrainNotices, TrainStatus } from "./types.js";
+import { describeLineAhead } from "./line-ahead.js";
+import type { LineAhead, TrainInArea, TrainNotices, TrainStatus } from "./types.js";
 
 const NAME_WIDTH = 30;
 const TRACK_WIDTH = 9;
@@ -41,6 +42,7 @@ export function renderTrainStrip(
   now: number = Date.now(),
   boardingStopIndex?: number,
   notices?: TrainNotices,
+  lineAhead?: LineAhead,
 ): string {
   const lines: string[] = [];
   const liveNote = status.realTime ? "live" : "timetable only, no live data";
@@ -74,6 +76,8 @@ export function renderTrainStrip(
   });
 
   if (lastPassed === -1) lines.push("(not departed yet)");
+  const ahead = lineAhead ? describeLineAhead(lineAhead) : undefined;
+  if (ahead) lines.push("", ahead);
   if (notices?.status === "ok" && notices.notices && notices.notices.length > 0) {
     lines.push("", `DB notices at ${notices.station}:`);
     for (const n of notices.notices) lines.push(` • ${n.text}`);

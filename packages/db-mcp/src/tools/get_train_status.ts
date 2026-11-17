@@ -4,7 +4,8 @@ import type { DbTimetablesClient } from "../clients/db-timetables.js";
 import { ProviderError } from "../errors.js";
 import { trainMapUrl } from "../map-link.js";
 import { renderTrainStrip } from "../render.js";
-import type { SourcedResponse, Stopover, TrainNotices, TrainStatus } from "../types.js";
+import { analyseLineAhead, boxAround, lastPassedIndex, stretchAhead } from "../line-ahead.js";
+import type { LineAhead, SourcedResponse, Stopover, TrainNotices, TrainStatus } from "../types.js";
 
 /** Optional source of DB notices; absent when no DB API key is configured. */
 export type NoticeSource = Pick<DbTimetablesClient, "getNoticesForTrain">;
@@ -12,7 +13,30 @@ export type NoticeSource = Pick<DbTimetablesClient, "getNoticesForTrain">;
 export type TrainStatusResult = TrainStatus & {
   /** DB notices at the user's boarding stop (delay reasons, catering, etc.). */
   boardingNotices: TrainNotices;
+  /** Your train checked against trains ahead on its route. Needs no DB key. */
+  lineAhead: LineAhead;
 };
+
+type TrainSource = Pick<TransitousClient, "getTrainStatus"> & Partial<Pick<TransitousClient, "getTrainsInArea">>;
+
+/** Check the trains ahead; failures never break the train answer. */
+async function lookUpLineAhead(client: TrainSource, status: TrainStatus, boarding: number | undefined): Promise<LineAhead> {
+  if (!client.getTrainsInArea) return { status: "not-checked", reason: "Area data unavailable" };
+  if (!status.realTime) return { status: "not-checked", reason: "No live data for this train" };
+  const now = Date.now();
+  const last = lastPassedIndex(status.stopovers, now);
+  // Estimate for the user's stop; without one, for the next stop.
+  const target = boarding ?? Math.min(last + 1, status.stopovers.length - 1);
+  if (target <= last) return { status: "not-checked", reason: "The train has already left that stop" };
+  try {
+    const box = boxAround(stretchAhead(status, target, now));
+    const others = await client.getTrainsInArea(box);
+    return analyseLineAhead(status, target, others, now);
+  } catch (err) {
+    if (err instanceof ProviderError) return { status: "not-checked", reason: err.message };
+    throw err;
+  }
+}
 
 /** Modes DB's timetable data covers; trams, U-Bahn and buses are not in it. */
 const DB_MODES = new Set(["HIGHSPEED_RAIL", "LONG_DISTANCE", "NIGHT_RAIL", "REGIONAL_FAST_RAIL", "REGIONAL_RAIL", "SUBURBAN"]);
@@ -81,14 +105,14 @@ async function lookUpNotices(
 }
 
 export function makeGetTrainStatusTool(
-  client: Pick<TransitousClient, "getTrainStatus">,
+  client: TrainSource,
   notices?: NoticeSource,
 ) {
   return {
     spec: {
       name: "get_train_status",
       description:
-        "Full per-stop status for one train run: scheduled and predicted times, arrival and departure delay in minutes at every stop, platform changes, cancellations and service alerts. Takes a tripId from find_train, get_departures or plan_journey. If you know where the user boards, pass that station's coordinates as boardLat/boardLon so their stop is marked. Also returns a text diagram of the route to show as-is, and a link to a live map of this train. boardingNotices holds DB's notices at the boarding stop (delay reasons, missing catering, missing coaches, bike spaces, disruptions); status 'off' means the optional DB API key is not configured. Answer the user's question first, then ask whether they want the live view; give the link only if they say yes.",
+        "Full per-stop status for one train run: scheduled and predicted times, arrival and departure delay in minutes at every stop, platform changes, cancellations and service alerts. Takes a tripId from find_train, get_departures or plan_journey. If you know where the user boards, pass that station's coordinates as boardLat/boardLon so their stop is marked. lineAhead checks the train against other trains ahead of it on its route: status 'held-up' means a train ahead will hold it up, with an estimate beyond the official prediction. Also returns a text diagram of the route to show as-is, and a link to a live map of this train. boardingNotices holds DB's notices at the boarding stop (delay reasons, missing catering, missing coaches, bike spaces, disruptions); status 'off' means the optional DB API key is not configured. Answer the user's question first, then ask whether they want the live view; give the link only if they say yes.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -107,11 +131,14 @@ export function makeGetTrainStatusTool(
         boardLat !== undefined && boardLon !== undefined
           ? nearestStopIndex(status.stopovers, { lat: boardLat, lon: boardLon })
           : undefined;
-      const boardingNotices = await lookUpNotices(notices, status, boarding);
+      const [boardingNotices, lineAhead] = await Promise.all([
+        lookUpNotices(notices, status, boarding),
+        lookUpLineAhead(client, status, boarding),
+      ]);
       return {
-        data: { ...status, boardingNotices },
+        data: { ...status, boardingNotices, lineAhead },
         source: "transitous",
-        diagram: renderTrainStrip(status, Date.now(), boarding, boardingNotices),
+        diagram: renderTrainStrip(status, Date.now(), boarding, boardingNotices, lineAhead),
         mapUrl: trainMapUrl(status.tripId, boarding),
       };
     },

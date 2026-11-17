@@ -76,6 +76,7 @@ Both are independently testable. Both ship in this repo.
 
 ## What's interesting under the hood
 
+- **It looks at the trains ahead of yours.** Trains can't overtake between two stops. If a train ahead of yours is held or slow on a stretch yours still has to pass, the tool works out when it will clear and what that means for your arrival, so you get "Officially 5 min late at Köln Hbf; RE 5 ahead is held near Bonn, so expect about 15–20 min late" instead of just the official figure. It needs no account or key.
 - **Live data for every kind of train.** Train data comes from [Transitous](https://transitous.org), an open, community-run service built on public timetable and realtime feeds. It covers long-distance, regional, S-Bahn, U-Bahn and tram, with the delay at every stop of a run.
 - **Late and stuck trains in an area.** One tool lists the trains currently running late around a point, with an estimated position, and flags those losing 10+ minutes between two stops as likely stuck.
 - **Optional DB notices.** With a free DB API key, answers also show what DB has posted for your train at your stop: delay reasons ("Repair to a signal"), missing catering, missing coaches, bike spaces, construction work. See [Using the DB API](#using-the-db-api-optional).
@@ -273,11 +274,13 @@ packages/
 │   │   ├── clients/         Transitous (trains), DWD (weather), DB Timetables (notices)
 │   │   ├── db/              DB message codes and key handling
 │   │   ├── setup-db-api.ts  terminal commands to save, check and remove the DB key
+│   │   ├── line-ahead.ts    checks your train against the trains ahead of it
 │   │   ├── render.ts        plain-text route and late-train diagrams
 │   │   ├── map-link.ts      links to the live map page
 │   │   ├── cache.ts         LRU
 │   │   └── types.ts         normalized domain types
 │   ├── scripts/smoke.mjs    live check against the real services
+│   ├── scripts/line-ahead-sweep.mjs  live check of the line-ahead estimate
 │   └── tests/               vitest + msw
 └── skill-db-delay/
     └── SKILL.md             the reasoning playbook
@@ -298,6 +301,12 @@ To check the real services are still reachable and shaped as expected:
 
 ```bash
 npm run smoke -w db-mcp
+```
+
+To see the line-ahead estimate on live data (it finds trains that are held right now and checks the trains following them):
+
+```bash
+npm run sweep -w db-mcp
 ```
 
 ---
