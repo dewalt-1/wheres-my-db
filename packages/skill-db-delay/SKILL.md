@@ -92,6 +92,22 @@ Round to 5-minute buckets. "About 10–15 minutes" is honest; "12.4 minutes" is 
 - `clear`: trains ahead were checked and none holds the train up. You can say so in a few words ("nothing ahead is holding it up"); it supports an on-time verdict.
 - `not-checked`: say nothing about it.
 
+### Signal 1c: which train is holding it up
+
+When the user's train is 10+ minutes late, `get_train_status` also returns `culprit`, and the diagram shows it under "What may be holding it up".
+
+- `candidates`: suspects with evidence. Say "may be" and give the evidence; only `likely` deserves "probably". Never state one as fact.
+- `queuedBehind`: late trains that left after the user's train. They are waiting too; never call them the cause.
+- `otherFaults`: trains of the same line with a fault, possibly running the other way. Mention only as a possibility.
+- `notices`: DB's texts for this line. They may be about other trains; don't present one as the reason unless it clearly fits.
+- `none-found`: say the train holding it up couldn't be identified. Freight trains and many trains abroad are not in the data.
+
+When a train's estimate keeps sliding at each check (16:59, then 17:00, then 17:13 for a train that has not arrived), treat it as stuck: say the estimate is unreliable and give a wide range. If someone on board says it is standing still, believe them over the data.
+
+### Signal 1d: outside Germany
+
+`countries.abroad` lists the stops ahead that are outside Germany. German sources carry no disruption notices there: say so and, if you can search the web, check that country's rail operator. Always use the German data first for German stops.
+
 ### Signal 2: the transfer window
 
 Compare the predicted arrival of the incoming train with the predicted departure of the connecting one, both from live data. `plan_journey` does this for you and lists `riskyTransfers` (under 5 minutes between trains). Allow extra time when the trains use different platforms or the option contains a walking leg.

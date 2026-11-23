@@ -38,7 +38,7 @@ if (koeln) {
   const first = board?.[0];
   if (first) {
     await check("find_train", "find_train", { name: first.trainName, stationId: koeln.id }, (d) => `${d.length} run(s) of ${first.trainName}`);
-    await check("get_train_status", "get_train_status", { tripId: first.tripId }, (d) => `${d.name}: ${d.stopovers.length} stops, live=${d.realTime}, line ahead: ${d.lineAhead.status}${d.lineAhead.reason ? ` (${d.lineAhead.reason})` : ""}`);
+    await check("get_train_status", "get_train_status", { tripId: first.tripId }, (d) => `${d.name}: ${d.stopovers.length} stops, live=${d.realTime}, culprit: ${d.culprit.status}${d.culprit.reason ? ` (${d.culprit.reason})` : ""}, countries: ${d.countries.status}, line ahead: ${d.lineAhead.status}${d.lineAhead.reason ? ` (${d.lineAhead.reason})` : ""}`);
   }
   // Optional DB notices: only checked when a DB API key is configured.
   const dbTrain = board?.find((d) => ["HIGHSPEED_RAIL", "LONG_DISTANCE", "REGIONAL_FAST_RAIL", "REGIONAL_RAIL", "SUBURBAN"].includes(d.mode));

@@ -104,6 +104,7 @@ interface RawLeg {
   from?: RawPlace;
   to?: RawPlace;
   intermediateStops?: RawPlace[];
+  legGeometry?: { points?: unknown; precision?: unknown };
   startTime?: unknown;
   endTime?: unknown;
   scheduledStartTime?: unknown;
@@ -221,7 +222,7 @@ function betterRecord(a: { tripId: string; realTime: boolean }, b: { tripId: str
 }
 
 /** "ICE 124" is one train a day; "S12" is many, so a shared name proves nothing. */
-function isNumberedTrain(name: string): boolean {
+export function isNumberedTrain(name: string): boolean {
   return LONG_DISTANCE_NAME.test(name.trim());
 }
 
@@ -274,6 +275,30 @@ function onePerTrain<T extends { tripId: string; realTime: boolean }>(
     kept[i] = winner;
   }
   return kept;
+}
+
+/** Google-style encoded polyline to [lat, lon] points. */
+function decodePath(geometry: RawLeg["legGeometry"]): Array<[number, number]> | undefined {
+  const encoded = str(geometry?.points);
+  if (!encoded) return undefined;
+  const factor = 10 ** (num(geometry?.precision) ?? 6);
+  const out: Array<[number, number]> = [];
+  let i = 0, lat = 0, lon = 0;
+  const next = () => {
+    let shift = 0, value = 0, byte = 0;
+    do {
+      byte = encoded.charCodeAt(i++) - 63;
+      value |= (byte & 31) << shift;
+      shift += 5;
+    } while (byte >= 32 && i < encoded.length);
+    return value & 1 ? ~(value >> 1) : value >> 1;
+  };
+  while (i < encoded.length) {
+    lat += next();
+    lon += next();
+    out.push([lat / factor, lon / factor]);
+  }
+  return out;
 }
 
 function mapStopover(place: RawPlace): Stopover {
@@ -458,6 +483,7 @@ export class TransitousClient {
       realTime: leg.realTime === true,
       cancelled: leg.cancelled === true,
       stopovers: places.map(mapStopover),
+      path: decodePath(leg.legGeometry),
       alerts: alertTexts(leg.alerts),
     };
   }
@@ -549,6 +575,7 @@ export class TransitousClient {
         mode,
         fromStation: str(seg.from?.name) ?? "",
         toStation: str(seg.to?.name) ?? "",
+        fromStopId: str(seg.from?.stopId),
         fromLat,
         fromLon,
         toLat,

@@ -77,6 +77,7 @@ Both are independently testable. Both ship in this repo.
 ## What's interesting under the hood
 
 - **It looks at the trains ahead of yours.** Trains can't overtake between two stops. If a train ahead of yours is held or slow on a stretch yours still has to pass, the tool works out when it will clear and what that means for your arrival, so you get "Officially 5 min late at Köln Hbf; RE 5 ahead is held near Bonn, so expect about 15–20 min late" instead of just the official figure. It needs no account or key.
+- **It looks for the train holding yours up.** When your train is 10+ minutes late, it checks the trains on the same stretch, which of them are really ahead of yours, and whether a fault is reported on one. It gives suspects with the evidence, says so when it can't tell, and doesn't blame trains queuing behind you.
 - **Live data for every kind of train.** Train data comes from [Transitous](https://transitous.org), an open, community-run service built on public timetable and realtime feeds. It covers long-distance, regional, S-Bahn, U-Bahn and tram, with the delay at every stop of a run.
 - **Late and stuck trains in an area.** One tool lists the trains currently running late around a point, with an estimated position, and flags those losing 10+ minutes between two stops as likely stuck.
 - **Optional DB notices.** With a free DB API key, answers also show what DB has posted for your train at your stop: delay reasons ("Repair to a signal"), missing catering, missing coaches, bike spaces, construction work. See [Using the DB API](#using-the-db-api-optional).
@@ -199,15 +200,14 @@ The server is a stdio MCP — it speaks JSON-RPC over stdin/stdout per the [Mode
 
 ## Using the DB API (optional)
 
-Everything above works without any account. If you add a free key for Deutsche Bahn's own timetable API, answers about your train also show the notices DB has posted for it at your stop, the small things that add up. A real example from a train at Hamm:
+Everything above works without any account. If you add a free key for Deutsche Bahn's own API (OpenBoards), answers about your train also show what DB has posted about it: delay reasons, missing coaches, catering, and disruptions in plain words. A real example from ICE 124 at Köln:
 
 ```
-DB notices at Hamm (Westf), Hauptbahnhof:
- • Several coaches missing
- • Construction work
+DB notices at Köln Hbf:
+ • Repair work on a set of switches between Cologne Central Station and Düsseldorf Central Station is disrupting rail service. …
 ```
 
-These include delay reasons, catering, missing or reordered coaches, seat reservations, bike spaces, accessibility and construction work. Without a key you simply don't get this list; nothing else changes.
+The key also helps when your train is held up: the search for the train causing it can then use DB's recorded times and its fault notices. Without a key you simply don't get these; nothing else changes.
 
 ### 1. Get a free key
 
@@ -215,7 +215,9 @@ These include delay reasons, catering, missing or reordered coaches, seat reserv
 2. Create an application ("Neue Anwendung erstellen"). Only the title is required; leave the certificate and redirect URL empty.
    - If saving fails with an error about `application_public_certificate_entry`, paste a throwaway certificate into the certificate field. It is never used for this API. To make one: `openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 730 -subj "/CN=wheres-my-db"`, then paste the contents of `cert.pem`.
 3. Copy the **Client ID** and the **Client Secret**. The secret is shown only once.
-4. In the catalogue, open **Timetables**, choose the **Free** plan, click **Abonnieren** (subscribe) and select your application.
+4. Open [OpenBoards](https://developers.deutschebahn.com/db-api-marketplace/apis/product/open-boards), choose the **Free** plan, click **Abonnieren** (subscribe) and select your application.
+
+Have a key from before November 2026? Subscribe the same application to OpenBoards; the key stays the same.
 
 ### 2. Add the key
 
@@ -255,11 +257,11 @@ This says where the key was found and whether DB accepts it, without printing it
 
 ### Good to know
 
-- **Limits:** the free plan allows 60 calls a minute. Lookups are cached (a station's notices for one minute), which is plenty for personal use.
-- **Scope:** notices are fetched for the stop where you board, when the agent knows it.
+- **Limits:** the free plan allows 10 calls a second. Boards are cached for one minute.
+- **Scope:** German stations only. For stops abroad, the answer says which part of the route is not covered.
 - **Each user needs their own key.** Keys are personal; don't put yours in the repository or share it.
-- **Change ahead:** DB has announced that this API will be replaced by a new one ("OpenBoards"); the client may need updating when that happens.
-- **Licence:** DB publishes this data under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Credit: Deutsche Bahn AG.
+- **The older Timetables API:** DB takes no new subscriptions and plans to switch it off in mid-2027. If your key still has it, it is used for one thing: DB's latest reason for your train at its next stop, including stops abroad.
+- **Licence:** Timetables data is published under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). For OpenBoards, DB links to the [terms of its departure-board website](https://db.info/nutzungsbedingungen-web-bahnhofstafel). Credit: Deutsche Bahn AG.
 
 ---
 
@@ -275,6 +277,7 @@ packages/
 │   │   ├── db/              DB message codes and key handling
 │   │   ├── setup-db-api.ts  terminal commands to save, check and remove the DB key
 │   │   ├── line-ahead.ts    checks your train against the trains ahead of it
+│   │   ├── culprit.ts       looks for the train holding yours up
 │   │   ├── render.ts        plain-text route and late-train diagrams
 │   │   ├── map-link.ts      links to the live map page
 │   │   ├── cache.ts         LRU

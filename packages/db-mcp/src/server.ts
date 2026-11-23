@@ -10,6 +10,7 @@ import { ZodError } from "zod";
 import { TransitousClient } from "./clients/transitous.js";
 import { WeatherClient } from "./clients/weather.js";
 import { DbTimetablesClient } from "./clients/db-timetables.js";
+import { OpenBoardsClient } from "./clients/open-boards.js";
 import { loadDbCredentials } from "./db/credentials.js";
 import { createCache } from "./cache.js";
 import { makeResolveStationTool } from "./tools/resolve_station.js";
@@ -31,6 +32,7 @@ export type TrainData = Pick<
   | "getTrainStatus"
   | "planJourney"
   | "getTrainsInArea"
+  | "countryAt"
 >;
 
 /** The weather methods the tools need. */
@@ -126,7 +128,14 @@ function buildDefaultProviders(): { trains: TrainData; weather: WeatherData; not
 
   // Optional DB notices: only with a DB API key (see README, "Using the DB API").
   const creds = loadDbCredentials();
-  const notices = creds ? new DbTimetablesClient({ clientId: creds.clientId, apiKey: creds.apiKey }) : undefined;
+  const boards = creds ? new OpenBoardsClient(creds) : undefined;
+  const notices: NoticeSource | undefined = boards && creds
+    ? {
+        getNoticesForTrain: boards.getNoticesForTrain.bind(boards),
+        getBoard: boards.getBoard.bind(boards),
+        legacy: new DbTimetablesClient({ clientId: creds.clientId, apiKey: creds.apiKey }),
+      }
+    : undefined;
 
   return {
     notices,
@@ -137,6 +146,8 @@ function buildDefaultProviders(): { trains: TrainData; weather: WeatherData; not
       getTrainStatus: cached(live, "getTrainStatus", client.getTrainStatus.bind(client)),
       planJourney: cached(live, "planJourney", client.planJourney.bind(client)),
       getTrainsInArea: cached(live, "getTrainsInArea", client.getTrainsInArea.bind(client)),
+      // Keeps its own answers for the session: stations don't move.
+      countryAt: client.countryAt.bind(client),
     },
     weather: {
       getWarningsNear: cached(slow, "getWarningsNear", weatherClient.getWarningsNear.bind(weatherClient)),
