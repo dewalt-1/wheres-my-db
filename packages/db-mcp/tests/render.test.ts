@@ -100,6 +100,11 @@ describe("renderLateTrains", () => {
     expect(lines[13]).toBe("… and 3 more");
   });
 
+  it("marks a train whose two data sources disagree", () => {
+    const [, line] = renderLateTrains([train({ feedsDisagree: true })], { trainsChecked: 1 }).split("\n");
+    expect(line).toBe("  +89 min  RE1 (26814)    Leverkusen Mitte ●━━━━▶━━━━○ Köln Mülheim  ⚠ feeds disagree");
+  });
+
   it("handles no late trains", () => {
     expect(renderLateTrains([], { trainsChecked: 12 })).toBe("0 of 12 trains late, 0 likely stuck");
   });

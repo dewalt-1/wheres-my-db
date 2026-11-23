@@ -103,7 +103,10 @@ export function renderLateTrains(
     const at = Math.min(TRACK_WIDTH - 1, Math.floor(train.progress * TRACK_WIDTH));
     const track = `${"━".repeat(at)}▶${"━".repeat(TRACK_WIDTH - 1 - at)}`;
     const delay = `+${train.delayMinutes}`.padStart(5);
-    const flag = train.likelyStuck ? "  ⚠ likely stuck" : "";
+    const flag = [train.likelyStuck ? "⚠ likely stuck" : "", train.feedsDisagree ? "⚠ feeds disagree" : ""]
+      .filter(Boolean)
+      .map((f) => `  ${f}`)
+      .join("");
     lines.push(
       `${delay} min  ${fit(train.trainName, 14)} ${train.fromStation} ●${track}○ ${train.toStation}${flag}`,
     );

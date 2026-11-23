@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createServer, type TrainData, type WeatherData } from "../src/server.js";
 import { ProviderError } from "../src/errors.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
 function stubProviders() {
   const trains = {
@@ -32,6 +34,16 @@ describe("createServer", () => {
       "plan_journey",
       "resolve_station",
     ]);
+  });
+
+  it("tells every client, on connect, to show the diagram in its reply", async () => {
+    const { server } = createServer({ providers: stubProviders() });
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test", version: "0" });
+    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+    // Instructions travel in the initialize result, so agents without the skill get them.
+    expect(client.getInstructions()).toMatch(/include that diagram in your reply, unchanged, inside a code block/);
+    await client.close();
   });
 
   it("dispatches resolve_station and reports the source", async () => {

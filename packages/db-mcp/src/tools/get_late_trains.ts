@@ -23,7 +23,7 @@ export function makeGetLateTrainsTool(client: Pick<TransitousClient, "getTrainsI
     spec: {
       name: "get_late_trains",
       description:
-        "List trains currently running late around a point (station coordinates from resolve_station), worst first. Each has an estimated position, predicted delay at its next stop, and likelyStuck=true when it is losing 10+ minutes between two stops (an inference, not a confirmed standstill). Also returns a text diagram to show the user as-is, and a link to a live map of the area. Default radius 40 km, default minimum delay 5 min.",
+        "List trains currently running late around a point (station coordinates from resolve_station), worst first. Each has an estimated position, predicted delay at its next stop, and likelyStuck=true when it is losing 10+ minutes between two stops (an inference, not a confirmed standstill). feedsDisagree=true means two data sources report this run with clearly different delays or positions; say so rather than picking one. Also returns a text diagram and a link to a live map of the area. Always put this diagram in your reply, unchanged, in a code block, even in a short answer: it is part of the answer, not debug output. Give the map link straight away. Default radius 40 km, default minimum delay 5 min.",
       inputSchema: {
         type: "object" as const,
         properties: {

@@ -37,8 +37,17 @@ export const RAIL_MODES = [
 ] as const;
 const RAIL_MODE_SET: ReadonlySet<string> = new Set(RAIL_MODES);
 
+const LONG_DISTANCE_MODES = ["HIGHSPEED_RAIL", "LONG_DISTANCE", "NIGHT_RAIL"] as const;
+/** Train names that only ever run as long-distance trains. */
+const LONG_DISTANCE_NAME = /^(ICE|ECE|EC|IC|EN|NJ|RJX|RJ|TGV|FLX|THA|EST|ES)\s*\d/i;
+
 /** A train losing at least this much time between two stops is flagged likelyStuck. */
 const STUCK_MIN_GAIN_MINUTES = 10;
+/** A segment scheduled longer than this skips stops. */
+const MAX_STOP_TO_STOP_MINUTES = 60;
+const FEEDS_DISAGREE_MINUTES = 10;
+/** Two feeds' timetables for one train differ by at most this much. */
+const SAME_TRAIN_MINUTES = 3;
 
 export interface TransitousClientOptions {
   baseUrl?: string;
@@ -188,19 +197,83 @@ function mapStation(place: RawPlace | undefined): Station {
 }
 
 /**
- * Cross-border trains come from several feeds at once (ICE 224 is in both the
- * German and the Dutch feed). Keep one record per run, the same train at the
- * same scheduled time, preferring the one with live data: the other is often
- * timetable only and would say "on time" whatever is happening.
+ * Trip ids look like "20261117_16:38_nl-OpenOV_394269312": service day and
+ * start time first, then the feed. The same run from two feeds shares that
+ * start, wherever each feed currently places the train.
  */
-function onePerRun(departures: Departure[]): Departure[] {
-  const best = new Map<string, Departure>();
-  for (const d of departures) {
-    const key = `${normaliseName(d.trainName.replace(/\(.*\)/, ""))}@${d.scheduledDeparture}`;
-    const kept = best.get(key);
-    if (!kept || (d.realTime && !kept.realTime)) best.set(key, d);
+function runStart(tripId: string): string | undefined {
+  return /^\d{8}_\d{2}:\d{2}/.exec(tripId)?.[0];
+}
+
+/** The feed a trip id comes from, e.g. "de-DELFI" or "nl-OpenOV". */
+function feedOf(tripId: string): string {
+  return /^\d{8}_\d{2}:\d{2}_([^_]+)/.exec(tripId)?.[1] ?? "";
+}
+
+/**
+ * Which record of a train to trust: live data first, then the German source,
+ * then other countries'. A foreign feed often has no delays for German stops
+ * and shows them "on time", so it is only the fallback.
+ */
+function betterRecord(a: { tripId: string; realTime: boolean }, b: { tripId: string; realTime: boolean }): boolean {
+  if (a.realTime !== b.realTime) return a.realTime;
+  return feedOf(a.tripId).startsWith("de-") && !feedOf(b.tripId).startsWith("de-");
+}
+
+/** "ICE 124" is one train a day; "S12" is many, so a shared name proves nothing. */
+function isNumberedTrain(name: string): boolean {
+  return LONG_DISTANCE_NAME.test(name.trim());
+}
+
+function baseName(name: string): string {
+  return normaliseName(name.replace(/\(.*\)/, ""));
+}
+
+/**
+ * Two board entries that are the same train from two feeds. Only ever across
+ * feeds: one feed listing a line twice in a minute means two trains (both
+ * directions of the S12). Feeds' timetables can differ by a minute or two.
+ */
+function sameDeparture(a: Departure, b: Departure): boolean {
+  if (feedOf(a.tripId) === feedOf(b.tripId) || baseName(a.trainName) !== baseName(b.trainName)) return false;
+  const apart = Math.abs(Date.parse(a.scheduledDeparture) - Date.parse(b.scheduledDeparture));
+  if (apart > SAME_TRAIN_MINUTES * 60_000) return false;
+  if (isNumberedTrain(a.trainName)) return true;
+  return runStart(a.tripId) === runStart(b.tripId) && normaliseName(a.headsign) === normaliseName(b.headsign);
+}
+
+/** The same train in the area list: see sameDeparture. */
+function sameTrainInArea(a: TrainInArea, b: TrainInArea): boolean {
+  if (baseName(a.trainName) !== baseName(b.trainName)) return false;
+  const close = (x: number, y: number) => Math.abs(x - y) < 0.01;
+  const sameSegment =
+    close(a.fromLat, b.fromLat) && close(a.fromLon, b.fromLon) && close(a.toLat, b.toLat) && close(a.toLon, b.toLon);
+  if (feedOf(a.tripId) === feedOf(b.tripId)) {
+    // One feed listing a train twice: identical segment and times.
+    return sameSegment && a.predictedDeparture === b.predictedDeparture && a.predictedArrival === b.predictedArrival;
   }
-  return departures.filter((d) => [...best.values()].includes(d));
+  if (runStart(a.tripId) === undefined || runStart(a.tripId) !== runStart(b.tripId)) return false;
+  return isNumberedTrain(a.trainName) || sameSegment;
+}
+
+/** Keep one record per train, the one to trust most, in the original order. */
+function onePerTrain<T extends { tripId: string; realTime: boolean }>(
+  items: T[],
+  same: (a: T, b: T) => boolean,
+  onMerge?: (kept: T, dropped: T) => void,
+): T[] {
+  const kept: T[] = [];
+  for (const item of items) {
+    const i = kept.findIndex((k) => same(k, item));
+    if (i === -1) {
+      kept.push(item);
+      continue;
+    }
+    const [winner, loser] = betterRecord(item, kept[i]) ? [item, kept[i]] : [kept[i], item];
+    onMerge?.(winner, loser);
+    kept[i] = winner;
+  }
+  return kept;
 }
 
 function mapStopover(place: RawPlace): Stopover {
@@ -234,6 +307,7 @@ export class TransitousClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly userAgent: string;
+  private readonly countries = new Map<string, string | undefined>();
 
   constructor(opts: TransitousClientOptions = {}) {
     this.baseUrl = opts.baseUrl ?? DEFAULT_BASE_URL;
@@ -268,16 +342,18 @@ export class TransitousClient {
    */
   async getDepartures(
     stationId: string,
-    opts: { time?: string; limit?: number } = {},
+    opts: { time?: string; limit?: number; windowSeconds?: number; modes?: readonly string[] } = {},
   ): Promise<Departure[]> {
     const params: Record<string, string> = {
       stopId: stationId,
       n: String(opts.limit ?? 30),
       // Merge platforms/duplicate stop entries of the same station.
       radius: "200",
-      mode: RAIL_MODES.join(","),
+      mode: (opts.modes ?? RAIL_MODES).join(","),
     };
     if (opts.time) params.time = opts.time;
+    // With a window the board covers that whole span, however many entries it takes.
+    if (opts.windowSeconds) params.window = String(opts.windowSeconds);
     const raw = await this.get("/api/v5/stoptimes", params);
     const list = (raw as { stopTimes?: RawStopTime[] })?.stopTimes;
     if (!Array.isArray(list)) {
@@ -306,7 +382,7 @@ export class TransitousClient {
         realTime: st.realTime === true,
       });
     }
-    return onePerRun(departures);
+    return onePerTrain(departures, sameDeparture);
   }
 
   /**
@@ -323,7 +399,19 @@ export class TransitousClient {
     if (!wanted) {
       throw new ProviderError("empty train name", "transitous", "not_found");
     }
-    const board = await this.getDepartures(stationId, { time, limit: 120 });
+    // The board is sorted by actual departure, so a late train sits far down
+    // it. Search a time window rather than a number of entries, starting
+    // before the requested time in case the user is on board already.
+    // Long-distance names: only long-distance trains, 3 h either side.
+    // Others (S-Bahn, tram lines run often): all rail, 1 h before to 2 h after.
+    const longDistance = LONG_DISTANCE_NAME.test(trainName.trim());
+    const hoursBefore = longDistance ? 3 : 1;
+    const from = new Date(Date.parse(time ?? new Date().toISOString()) - hoursBefore * 3600_000);
+    const board = await this.getDepartures(stationId, {
+      time: from.toISOString(),
+      windowSeconds: (longDistance ? 6 : 3) * 3600,
+      modes: longDistance ? LONG_DISTANCE_MODES : RAIL_MODES,
+    });
     const matches = board.filter((d) => {
       const name = normaliseName(d.trainName);
       // "RE1 (26814)" should match both "RE1" and "RE1 (26814)".
@@ -338,6 +426,19 @@ export class TransitousClient {
       );
     }
     return matches;
+  }
+
+  /**
+   * ISO country code ("DE", "NL") of the stop at a point, via reverse
+   * geocoding. Stations don't move, so answers are kept for the session.
+   */
+  async countryAt(lat: number, lon: number): Promise<string | undefined> {
+    const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
+    if (this.countries.has(key)) return this.countries.get(key);
+    const raw = await this.get("/api/v1/reverse-geocode", { place: `${lat},${lon}`, type: "STOP" });
+    const country = str((raw as Array<{ country?: unknown }>)?.[0]?.country)?.toUpperCase();
+    this.countries.set(key, country);
+    return country;
   }
 
   /** Full per-stop status of one trip. */
@@ -407,7 +508,6 @@ export class TransitousClient {
       throw new ProviderError("map/trips did not return a list", "transitous", "parse");
     }
     const byTrip = new Map<string, TrainInArea>();
-    const runKey = new Map<string, string>();
     for (const seg of raw as RawMapSegment[]) {
       const mode = str(seg.mode) ?? "";
       if (!RAIL_MODE_SET.has(mode)) continue;
@@ -438,6 +538,11 @@ export class TransitousClient {
       const departureDelay = delayMinutes(str(seg.scheduledDeparture), dep) ?? 0;
       const delay = delayMinutes(str(seg.scheduledArrival), arr) ?? departureDelay;
       const gained = delay - departureDelay;
+      // A segment scheduled at over an hour skips stops (cancelled ones, as in
+      // a diversion). Time lost there is the detour, not a train standing still.
+      const scheduledMinutes =
+        (Date.parse(str(seg.scheduledArrival) ?? arr) - Date.parse(str(seg.scheduledDeparture) ?? dep)) / 60_000;
+      const skipsStops = scheduledMinutes > MAX_STOP_TO_STOP_MINUTES;
       const train: TrainInArea = {
         tripId,
         trainName: str(seg.trips?.[0]?.displayName) ?? mode,
@@ -455,25 +560,21 @@ export class TransitousClient {
         lon: fromLon + (toLon - fromLon) * progress,
         progress,
         delayGainedOnSegmentMinutes: gained,
-        likelyStuck: gained >= STUCK_MIN_GAIN_MINUTES,
+        likelyStuck: gained >= STUCK_MIN_GAIN_MINUTES && !skipsStops,
         realTime: seg.realTime === true,
       };
       // A trip can appear on several segments; keep the one in progress now.
       const existing = byTrip.get(tripId);
       const inProgress = now >= depMs && now <= arrMs;
-      if (!existing || inProgress) {
-        byTrip.set(tripId, train);
-        runKey.set(tripId, `${normaliseName(train.trainName)}@${str(seg.scheduledDeparture) ?? dep}`);
-      }
+      if (!existing || inProgress) byTrip.set(tripId, train);
     }
-    // The same run from two feeds (see onePerRun): keep the live one.
-    const best = new Map<string, TrainInArea>();
-    for (const [tripId, train] of byTrip) {
-      const key = runKey.get(tripId) ?? tripId;
-      const kept = best.get(key);
-      if (!kept || (train.realTime && !kept.realTime)) best.set(key, train);
-    }
-    return [...best.values()];
+    return onePerTrain([...byTrip.values()], sameTrainInArea, (kept, dropped) => {
+      const differ =
+        Math.abs(kept.delayMinutes - dropped.delayMinutes) >= FEEDS_DISAGREE_MINUTES ||
+        Math.abs(kept.fromLat - dropped.fromLat) > 0.01 || Math.abs(kept.fromLon - dropped.fromLon) > 0.01;
+      // Say so, so nobody states either as fact.
+      if (dropped.feedsDisagree || (kept.realTime && dropped.realTime && differ)) kept.feedsDisagree = true;
+    });
   }
 
   private mapJourneyLeg(leg: RawLeg): JourneyLeg {

@@ -128,6 +128,8 @@ export interface TrainInArea {
    * not a confirmed standstill.
    */
   likelyStuck: boolean;
+  /** Two feeds report this run and give clearly different delays or positions. */
+  feedsDisagree?: boolean;
   realTime: boolean;
 }
 
