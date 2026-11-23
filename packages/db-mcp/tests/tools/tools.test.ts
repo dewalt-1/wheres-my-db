@@ -38,6 +38,8 @@ describe("pass-through tools", () => {
       ...status,
       boardingNotices: { status: "off" },
       lineAhead: { status: "not-checked", reason: "Area data unavailable" },
+      countries: { status: "not-checked", reason: "Country lookup unavailable" },
+      culprit: { status: "not-checked", reason: "Area data unavailable" },
     });
     expect(res.diagram).toContain("ICE 1 → Berlin");
     expect(res.mapUrl).toBe("https://dewalt-1.github.io/wheres-my-db/?trip=t");
@@ -72,6 +74,7 @@ describe("pass-through tools", () => {
     const koeln = { stationName: "Köln Hbf", stationId: "k", lat: 50.943, lon: 6.9587, cancelled: false, alerts: [], scheduledDeparture: "2026-11-15T21:37:00Z" };
     const status = { tripId: "t", name: "RE1 (26814)", trainNumber: "26814", headsign: "Aachen", mode: "REGIONAL_RAIL", realTime: true, cancelled: false, alerts: [], stopovers: [koeln] };
     const getTrainStatus = vi.fn().mockResolvedValue(status);
+    const getBoard = vi.fn().mockResolvedValue([]);
     const at = { tripId: "t", boardLat: 50.943, boardLon: 6.959 };
 
     it("reports 'off' when no DB key is configured", async () => {
@@ -85,15 +88,15 @@ describe("pass-through tools", () => {
         station: "Köln Hbf",
         notices: [{ kind: "delay-reason", text: "Repair to a signal", code: 34 }, { kind: "quality", text: "No food or drink available", code: 90 }],
       });
-      const res = await makeGetTrainStatusTool({ getTrainStatus }, { getNoticesForTrain }).handler(at);
-      expect(getNoticesForTrain).toHaveBeenCalledWith("Köln Hbf", "26814", "2026-11-15T21:37:00Z");
+      const res = await makeGetTrainStatusTool({ getTrainStatus }, { getNoticesForTrain, getBoard }).handler(at);
+      expect(getNoticesForTrain).toHaveBeenCalledWith(koeln, "26814", "2026-11-15T21:37:00Z", undefined);
       expect(res.data.boardingNotices.status).toBe("ok");
       expect(res.diagram).toContain("DB notices at Köln Hbf:\n • Repair to a signal\n • No food or drink available");
     });
 
     it("keeps working when DB fails, and says why", async () => {
       const getNoticesForTrain = vi.fn().mockRejectedValue(new ProviderError("DB API timed out after 15000ms", "db", "timeout"));
-      const res = await makeGetTrainStatusTool({ getTrainStatus }, { getNoticesForTrain }).handler(at);
+      const res = await makeGetTrainStatusTool({ getTrainStatus }, { getNoticesForTrain, getBoard }).handler(at);
       expect(res.data.boardingNotices).toEqual({ status: "error", station: "Köln Hbf", message: "DB API timed out after 15000ms" });
       expect(res.data.name).toBe("RE1 (26814)");
     });
@@ -101,14 +104,14 @@ describe("pass-through tools", () => {
     it("does not ask DB about trams or U-Bahn", async () => {
       const getNoticesForTrain = vi.fn();
       const tram = vi.fn().mockResolvedValue({ ...status, name: "16", mode: "TRAM" });
-      const res = await makeGetTrainStatusTool({ getTrainStatus: tram }, { getNoticesForTrain }).handler(at);
+      const res = await makeGetTrainStatusTool({ getTrainStatus: tram }, { getNoticesForTrain, getBoard }).handler(at);
       expect(res.data.boardingNotices).toEqual({ status: "not-covered" });
       expect(getNoticesForTrain).not.toHaveBeenCalled();
     });
 
     it("reports a station DB could not match", async () => {
       const getNoticesForTrain = vi.fn().mockResolvedValue(null);
-      const res = await makeGetTrainStatusTool({ getTrainStatus }, { getNoticesForTrain }).handler(at);
+      const res = await makeGetTrainStatusTool({ getTrainStatus }, { getNoticesForTrain, getBoard }).handler(at);
       expect(res.data.boardingNotices).toEqual({ status: "station-not-found", station: "Köln Hbf" });
     });
   });
@@ -156,6 +159,112 @@ describe("pass-through tools", () => {
       const res = await tool.handler({ tripId: "yours", boardLat: 50.3, boardLon: 7 });
       expect(res.data.lineAhead).toEqual({ status: "not-checked", reason: "No live data for this train" });
       expect(getTrainsInArea).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("get_train_status: route outside Germany, and what holds the train up", () => {
+    // Shaped like ICE 124 on 23 Nov 2026: past Oberhausen, 45 min late at Arnhem.
+    const T0 = Date.now();
+    const at = (min: number) => new Date(T0 + min * 60_000).toISOString();
+    const s = (name: string, id: string, lat: number, dep: number, late = 0) => ({
+      stationName: name, stationId: id, lat, lon: 6.5, cancelled: false, alerts: [],
+      scheduledArrival: at(dep - 1 - late), scheduledDeparture: at(dep - late),
+      predictedArrival: at(dep - 1), predictedDeparture: at(dep), arrivalDelayMinutes: late,
+    });
+    const route = (offset = 0) => ({
+      tripId: "20261123_13:34_de-DELFI_1", name: "ICE 124", trainNumber: "124", headsign: "Amsterdam Centraal", mode: "HIGHSPEED_RAIL",
+      realTime: true, cancelled: false, alerts: [],
+      path: Array.from({ length: 120 }, (_, i): [number, number] => [50.94 + i * 0.01, 6.5]),
+      stopovers: [
+        s("Köln Hbf", "de-DELFI_de:05315:11201", 50.94, -100 + offset), s("Oberhausen Hbf", "de-DELFI_de:05119:14022:90:9", 51.47, -60 + offset, 21),
+        s("Arnhem Centraal", "de-DELFI_nl:4:18038", 51.98, 20 + offset, 45), s("Utrecht Centraal", "de-DELFI_000008400621", 52.09, 50 + offset, 41),
+      ],
+    });
+    // Stand-in for reverse geocoding: north of 51.9 is the Netherlands here.
+    const countryAt = vi.fn(async (lat: number) => (lat > 51.9 ? "NL" : "DE"));
+    const local = (over: Record<string, unknown>) => ({
+      tripId: "20261123_15:50_de-DELFI_2", trainName: "RE19", mode: "REGIONAL_RAIL", fromStation: "Emmerich", toStation: "Elten",
+      fromStopId: "de-DELFI_de:05154:36119", fromLat: 51.83, fromLon: 6.5, toLat: 51.86, toLon: 6.5,
+      predictedDeparture: at(-20), predictedArrival: at(5), delayMinutes: 30, lat: 51.84, lon: 6.5, progress: 0.3,
+      delayGainedOnSegmentMinutes: 12, likelyStuck: true, realTime: true, ...over,
+    });
+    const localTrip = (number: string, leftOberhausen: number) => ({ ...route(), name: "RE19", trainNumber: number, stopovers: [s("Oberhausen Hbf", "x", 51.47, leftOberhausen)] });
+    const boardTrain = (number: string, causes: number[], disruptions: unknown[] = []) => ({
+      journeyId: number, name: "RE19", number, scheduled: at(-30), time: at(-20), cancelled: false, causes, quality: [], disruptions,
+    });
+    const repairs = { id: "d1", cause: "UNKNOWN_CAUSE", text: "Repairs on several trains of the RE 19." };
+    const build = (leftOberhausen: number, causes: number[] = [36], withKey = true) => {
+      const getTrainStatus = vi.fn(async (id: string) => (id.endsWith("_1") ? route() : localTrip("20024", leftOberhausen)));
+      const getBoard = vi.fn(async () => [
+        boardTrain("20024", causes, [repairs]), boardTrain("20029", [36]),
+        boardTrain("20030", [], [{ id: "d2", cause: "CONSTRUCTION", text: "Building site until 2027" }]),
+      ]);
+      const legacy = { getNoticesForTrain: vi.fn().mockResolvedValue({ station: "Arnhem", notices: [{ kind: "delay-reason", text: "Technical fault on another train" }] }) };
+      const key = { getNoticesForTrain: vi.fn().mockResolvedValue({ station: "x", notices: [] }), getBoard, legacy };
+      return { tool: makeGetTrainStatusTool({ getTrainStatus, countryAt, getTrainsInArea: vi.fn().mockResolvedValue([local({})]) } as never, withKey ? (key as never) : undefined), getBoard, legacy };
+    };
+    const run = (t: ReturnType<typeof build>) => t.tool.handler({ tripId: "20261123_13:34_de-DELFI_1" });
+
+    it("names the stops outside Germany", async () => {
+      const res = await run(build(-75));
+      expect(res.data.countries).toEqual({
+        status: "crosses-border",
+        abroad: [{ country: "NL", countryName: "the Netherlands", stops: ["Arnhem Centraal", "Utrecht Centraal"] }],
+      });
+      expect(res.diagram).toContain(
+        "Outside Germany: Arnhem Centraal → Utrecht Centraal (the Netherlands). German sources have no disruption notices there.",
+      );
+      expect(res.data).not.toHaveProperty("path");
+    });
+
+    it("finds a local train ahead with a fault of its own, though the express skips its stations", async () => {
+      const t = build(-75);
+      const res = await run(t);
+      expect(res.data.culprit).toMatchObject({
+        status: "candidates", dbReason: "Technical fault on another train",
+        candidates: [{ trainName: "RE19 (20024)", confidence: "likely", where: "Emmerich → Elten" }],
+        notices: [{ text: repairs.text }],
+      });
+      expect(res.data.culprit.otherFaults).toEqual([expect.stringContaining("RE19 (20029): Technical problem with the train")]);
+      expect(res.diagram).toContain("What may be holding it up:");
+      expect(res.diagram).toContain(" • DB's reason: Technical fault on another train");
+      expect(res.diagram).toContain(" • Likely RE19 (20024), Emmerich → Elten: +30 min, DB: Technical problem with the train");
+      expect(res.diagram).not.toContain("Building site");
+      // German stations only, including one the express passes without stopping.
+      expect((t.getBoard.mock.calls as unknown as string[][]).map((c) => c[0])).toEqual(["de:05119:14022", "de:05154:36119"]);
+    });
+
+    it("does not blame a train that left after yours", async () => {
+      const res = await run(build(-40));
+      expect(res.data.culprit).toMatchObject({ status: "none-found", candidates: [], queuedBehind: ["RE19 (20024) +30 min"] });
+      expect(res.diagram).toContain(" • No train ahead could be identified as the cause");
+    });
+
+    it("goes by DB's recorded departures when the other source has it the wrong way round", async () => {
+      const t = build(-75);
+      const rec = (number: string, time: string) => ({ ...boardTrain(number, []), time });
+      t.getBoard.mockResolvedValue([rec("124", at(-60)), rec("20024", at(-55))]);
+      const res = await run(t);
+      expect(res.data.culprit).toMatchObject({ status: "none-found", queuedBehind: ["RE19 (20024) +30 min"] });
+    });
+
+    it("works without a DB key, with less to go on", async () => {
+      const res = await run(build(-75, [], false));
+      expect(res.data.culprit).toMatchObject({ status: "candidates", candidates: [{ confidence: "possible" }], notices: [] });
+      expect(res.data.boardingNotices).toEqual({ status: "off" });
+    });
+
+    it("keeps the answer when a lookup fails, and stays quiet for trains on time", async () => {
+      const fail = () => vi.fn().mockRejectedValue(new ProviderError("timed out", "transitous", "timeout"));
+      const broken = makeGetTrainStatusTool({ getTrainStatus: vi.fn().mockResolvedValue(route()), countryAt: fail(), getTrainsInArea: fail() });
+      const res = await broken.handler({ tripId: "x" });
+      expect(res.data.culprit).toEqual({ status: "not-checked", reason: "timed out" });
+      expect(res.data.countries).toEqual({ status: "not-checked", reason: "timed out" });
+      expect(res.data.name).toBe("ICE 124");
+      const onTime = { ...route(), stopovers: route().stopovers.map((x) => ({ ...x, arrivalDelayMinutes: 2 })) };
+      const quiet = await makeGetTrainStatusTool({ getTrainStatus: vi.fn().mockResolvedValue(onTime), getTrainsInArea: vi.fn().mockResolvedValue([local({})]) }).handler({ tripId: "x" });
+      expect(quiet.data.culprit).toEqual({ status: "not-checked", reason: "Not late enough to look for a cause" });
+      expect(quiet.diagram).not.toContain("What may be holding it up");
     });
   });
 

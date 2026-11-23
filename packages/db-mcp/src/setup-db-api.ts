@@ -6,7 +6,7 @@
 //   node packages/db-mcp/dist/index.js remove-db-api   delete the saved key
 
 import { createInterface } from "node:readline";
-import { DbTimetablesClient } from "./clients/db-timetables.js";
+import { OpenBoardsClient } from "./clients/open-boards.js";
 import { ProviderError } from "./errors.js";
 import { configFilePath, loadDbCredentials, removeDbCredentials, saveDbCredentials } from "./db/credentials.js";
 
@@ -28,11 +28,12 @@ function ask(question: string, hidden = false): Promise<string> {
   });
 }
 
-/** One cheap call that proves the key and the Timetables subscription work. */
+/** One cheap call that proves the key and the OpenBoards subscription work. */
 async function check(clientId: string, apiKey: string): Promise<string | null> {
   try {
-    const eva = await new DbTimetablesClient({ clientId, apiKey }).findStationEva("Köln Hbf");
-    return eva ? null : "the key works, but the test lookup returned nothing";
+    const now = Date.now();
+    await new OpenBoardsClient({ clientId, apiKey }).getBoard("de:05315:11201", now, now + 30 * 60_000); // Köln Hbf
+    return null;
   } catch (err) {
     return err instanceof ProviderError ? err.message : (err as Error).message;
   }

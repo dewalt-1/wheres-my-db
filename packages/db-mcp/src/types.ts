@@ -70,6 +70,8 @@ export interface TrainStatus {
   realTime: boolean;
   cancelled: boolean;
   stopovers: Stopover[];
+  /** Route line as [lat, lon]; used internally, not returned by the tool. */
+  path?: Array<[number, number]>;
   /** Trip-level service alerts, as plain text. */
   alerts: string[];
 }
@@ -106,6 +108,8 @@ export interface TrainInArea {
   fromStation: string;
   toStation: string;
   /** Coordinates of the stop it last left and the one it is heading to. */
+  /** Upstream stop id of the last stop; German ones contain DB's stop code. */
+  fromStopId?: string;
   fromLat: number;
   fromLon: number;
   toLat: number;
@@ -190,6 +194,47 @@ export interface TrainNotices {
   station?: string;
   notices?: Notice[];
   message?: string;
+}
+
+/**
+ * Which part of the train's remaining route is outside Germany. German
+ * sources (Transitous' German feed, DB) don't carry disruption notices for
+ * other countries, so the agent should check that country's operator.
+ */
+export interface RouteCountries {
+  status: "germany-only" | "crosses-border" | "not-checked";
+  abroad?: Array<{
+    /** ISO country code, e.g. "NL". */
+    country: string;
+    countryName: string;
+    stops: string[];
+  }>;
+  reason?: string;
+}
+
+/** A train that may be holding the user's train up, with the evidence. */
+export interface CulpritCandidate {
+  trainName: string;
+  where: string;
+  delayMinutes: number;
+  /** "likely": left before the user's train and DB reports a fault on it. Never certain. */
+  confidence: "likely" | "possible";
+  evidence: string[];
+}
+
+/** Search for the train that is holding the user's train up. */
+export interface Culprit {
+  status: "candidates" | "none-found" | "not-checked";
+  reason?: string;
+  /** DB's latest reason for the user's train, e.g. "Technical fault on another train". */
+  dbReason?: string;
+  candidates?: CulpritCandidate[];
+  /** Late trains that left after the user's train: queued too, not the cause. */
+  queuedBehind?: string[];
+  /** Trains of the same lines with a fault of their own; may run the other way. */
+  otherFaults?: string[];
+  /** DB's disruption texts at stations along the stretch. */
+  notices?: Array<{ text: string; stations: string[] }>;
 }
 
 /** A weather warning from DWD (Deutscher Wetterdienst). */

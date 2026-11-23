@@ -3,7 +3,7 @@
 // attach these to their results so the agent can paste them verbatim.
 
 import { describeLineAhead } from "./line-ahead.js";
-import type { LineAhead, TrainInArea, TrainNotices, TrainStatus } from "./types.js";
+import type { Culprit, LineAhead, RouteCountries, TrainInArea, TrainNotices, TrainStatus } from "./types.js";
 
 const NAME_WIDTH = 30;
 const TRACK_WIDTH = 9;
@@ -33,6 +33,32 @@ function delayLabel(minutes: number | undefined): string {
   return "on time";
 }
 
+/** Whole sentences, up to about 220 characters. */
+function brief(text: string): string {
+  let out = "";
+  for (const sentence of text.match(/(?:[^.]|\.(?=\S))+\.?\s*/g) ?? [text]) {
+    if (out && out.length + sentence.length > 220) break;
+    out += sentence;
+  }
+  return out.trim();
+}
+
+/** The search for the train that holds the user's train up, as bullet lines. */
+function culpritLines(c: Culprit): string[] {
+  if (c.status === "not-checked") return [];
+  const out: string[] = [];
+  if (c.dbReason) out.push(` • DB's reason: ${c.dbReason}`);
+  for (const t of c.candidates ?? []) {
+    const late = t.evidence.includes("running late") || t.delayMinutes >= 1 ? `+${t.delayMinutes} min, ` : "";
+    out.push(` • ${t.confidence === "likely" ? "Likely" : "Possibly"} ${t.trainName}, ${t.where}: ${late}${t.evidence.join(", ")}`);
+  }
+  if (c.status === "none-found") out.push(" • No train ahead could be identified as the cause");
+  if (c.queuedBehind?.length) out.push(` • Also late, but left after it: ${c.queuedBehind.join(", ")}`);
+  for (const f of c.otherFaults ?? []) out.push(` • Fault on the same line, direction unknown: ${f}`);
+  for (const n of c.notices ?? []) out.push(` • DB notice on this line (${n.stations[0]}): ${brief(n.text)}`);
+  return out;
+}
+
 /**
  * One train's route as a vertical line: ● stops already passed, ○ stops
  * ahead, ▼ where the train is now, with the delay at every stop.
@@ -43,6 +69,8 @@ export function renderTrainStrip(
   boardingStopIndex?: number,
   notices?: TrainNotices,
   lineAhead?: LineAhead,
+  countries?: RouteCountries,
+  culprit?: Culprit,
 ): string {
   const lines: string[] = [];
   const liveNote = status.realTime ? "live" : "timetable only, no live data";
@@ -81,6 +109,12 @@ export function renderTrainStrip(
   if (notices?.status === "ok" && notices.notices && notices.notices.length > 0) {
     lines.push("", `DB notices at ${notices.station}:`);
     for (const n of notices.notices) lines.push(` • ${n.text}`);
+  }
+  const why = culprit ? culpritLines(culprit) : [];
+  if (why.length > 0) lines.push("", "What may be holding it up:", ...why);
+  for (const part of countries?.status === "crosses-border" ? countries.abroad ?? [] : []) {
+    const stretch = part.stops.length > 1 ? `${part.stops[0]} → ${part.stops[part.stops.length - 1]}` : part.stops[0];
+    lines.push("", `Outside Germany: ${stretch} (${part.countryName}). German sources have no disruption notices there.`);
   }
   return lines.join("\n");
 }
