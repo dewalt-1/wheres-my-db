@@ -121,6 +121,47 @@ describe("TransitousClient.findTrain", () => {
     });
   });
 
+  describe("duplicate records of one train", () => {
+    const entry = (tripId: string, name: string, headsign: string, sched: string, pred: string, realTime = true) => ({
+      tripId, displayName: name, headsign, mode: "HIGHSPEED_RAIL", realTime,
+      place: { name: "Düsseldorf Hbf", scheduledDeparture: sched, departure: pred },
+    });
+    const board = (...stopTimes: unknown[]) =>
+      mswServer.use(http.get(`${BASE}/api/v5/stoptimes`, () => HttpResponse.json({ stopTimes })));
+    const ids = async () => (await new TransitousClient().getDepartures(KOELN)).map((d) => d.tripId);
+    const dutch = entry("20261123_13:34_nl-OpenOV_381860864", "ICE 124", "Amsterdam Centraal", "2026-11-23T14:12:00Z", "2026-11-23T14:12:00Z");
+    const german = entry("20261123_13:34_de-DELFI_3490186591", "ICE 124", "Amsterdam Centraal", "2026-11-23T14:11:00Z", "2026-11-23T14:28:00Z");
+
+    it("prefers the live German record, whichever comes first, even when timetables differ by a minute", async () => {
+      board(dutch, german);
+      expect(await ids()).toEqual([german.tripId]);
+      board(german, dutch);
+      expect(await ids()).toEqual([german.tripId]);
+    });
+
+    it("falls back to another country's record when the German one has no live data", async () => {
+      board({ ...german, realTime: false }, dutch);
+      expect(await ids()).toEqual([dutch.tripId]);
+    });
+
+    it("keeps two trains of one line that leave in the same minute", async () => {
+      // Real board at Köln: both directions of the S12 at 16:10.
+      board(
+        entry("20261123_15:20_de-DELFI_1", "S12", "Hennef Bf", "2026-11-23T16:10:00Z", "2026-11-23T16:10:00Z"),
+        entry("20261123_15:20_de-DELFI_2", "S12", "Kerpen Horrem Bf", "2026-11-23T16:10:00Z", "2026-11-23T16:10:00Z"),
+      );
+      expect(await ids()).toHaveLength(2);
+    });
+
+    it("keeps different runs of a line that two feeds both carry", async () => {
+      board(
+        entry("20261123_15:20_de-DELFI_1", "RE19", "Arnhem Centraal", "2026-11-23T16:10:00Z", "2026-11-23T16:10:00Z"),
+        entry("20261123_15:50_nl-OpenOV_2", "RE19", "Düsseldorf Hbf", "2026-11-23T16:10:00Z", "2026-11-23T16:10:00Z"),
+      );
+      expect(await ids()).toHaveLength(2);
+    });
+  });
+
   it("searches a window wide enough to reach a train that is hours late", async () => {
     // The board is sorted by actual departure. With a fixed number of entries,
     // a train running 30+ min late fell past the end and only its
@@ -305,14 +346,47 @@ describe("TransitousClient.getTrainsInArea", () => {
     );
     const trains = await new TransitousClient().getTrainsInArea(box);
     expect(trains).toHaveLength(1);
-    // The feed with an ordinary stop-to-stop segment wins; the disagreement is flagged.
-    expect(trains[0]).toMatchObject({ fromStation: "Siegburg/Bonn", delayMinutes: 53, feedsDisagree: true });
+    // The German source comes first; the disagreement is flagged.
+    expect(trains[0]).toMatchObject({ fromStation: "Utrecht Centraal", delayMinutes: 164, likelyStuck: false, feedsDisagree: true });
+  });
+
+  it("does not merge two trains of one line from the same feed that started at the same time", async () => {
+    const a = { ...dutchFeed, trips: [{ tripId: "20261117_16:38_de-DELFI_1", displayName: "S12" }] };
+    const b = { ...germanFeedDiverted, trips: [{ tripId: "20261117_16:38_de-DELFI_2", displayName: "S12" }] };
+    mswServer.use(http.get(`${BASE}/api/v5/map/trips`, () => HttpResponse.json([a, b])));
+    expect(await new TransitousClient().getTrainsInArea(box)).toHaveLength(2);
+  });
+
+  it("merges one train listed twice by the same feed on the same segment and times", async () => {
+    // "91N", listed twice in the German feed on 17 Nov 2026.
+    const twice = [1, 2].map((n) => ({ ...germanFeedDiverted, trips: [{ tripId: `20261117_18:01_de-DELFI_${n}`, displayName: "91N" }] }));
+    mswServer.use(http.get(`${BASE}/api/v5/map/trips`, () => HttpResponse.json(twice)));
+    const trains = await new TransitousClient().getTrainsInArea(box);
+    expect(trains).toHaveLength(1);
+    expect(trains[0].feedsDisagree).toBeUndefined();
   });
 
   it("does not call a train stuck on a segment that skips cancelled stops", async () => {
     mswServer.use(http.get(`${BASE}/api/v5/map/trips`, () => HttpResponse.json([germanFeedDiverted])));
     const [train] = await new TransitousClient().getTrainsInArea(box);
     expect(train).toMatchObject({ delayMinutes: 164, likelyStuck: false });
+  });
+});
+
+describe("TransitousClient.countryAt", () => {
+  it("returns the country code of the nearest stop and asks only once per place", async () => {
+    let calls = 0;
+    mswServer.use(
+      http.get(`${BASE}/api/v1/reverse-geocode`, ({ request }) => {
+        calls++;
+        expect(new URL(request.url).searchParams.get("place")).toBe("52.0894,5.1101");
+        return HttpResponse.json([{ name: "Utrecht Centraal", country: "NL", type: "STOP" }]);
+      }),
+    );
+    const client = new TransitousClient();
+    expect(await client.countryAt(52.0894, 5.1101)).toBe("NL");
+    expect(await client.countryAt(52.0894, 5.1101)).toBe("NL");
+    expect(calls).toBe(1);
   });
 });
 
